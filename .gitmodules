@@ -1,0 +1,3 @@
+[submodule "DynamicHistogram/lib/googletest"]
+	path = DynamicHistogram/lib/googletest
+	url = git@github.com:google/googletest.git
