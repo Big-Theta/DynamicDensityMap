@@ -1,11 +1,11 @@
 #include <cstddef>
+#include <random>
 #include <string>
 #include <vector>
 
 #include "gtest/gtest.h"
 
 #include "DynamicHistogram.h"
-
 
 using testing::Eq;
 
@@ -21,92 +21,16 @@ public:
   virtual ~DynamicHistogramReference() {}
 
   void addValue(double val) {
-    // Decay
-    for (int i = 0; i < counts_.size(); i++) {
-      counts_[i] = counts_[i] * decay_rate_;
-    }
+    generation_++;
+    decay();
+    int bucket_idx = insert_value(val);
 
-    // Adjust bounds
-    int bucket_idx;
-    for (bucket_idx = 0; bucket_idx < ubounds_.size(); bucket_idx++) {
-      if (val < ubounds_[bucket_idx]) {
-        break;
-      }
-    }
-
-    if (bucket_idx > 0) {
-      double count_with_below = counts_[bucket_idx - 1] + counts_[bucket_idx];
-      ubounds_[bucket_idx - 1] =
-          (count_with_below * ubounds_[bucket_idx - 1] + val) /
-          (count_with_below + 1.0);
-    }
-
-    if (bucket_idx < ubounds_.size()) {
-      double count_with_above = counts_[bucket_idx] + counts_[bucket_idx + 1];
-      ubounds_[bucket_idx] = (count_with_above * ubounds_[bucket_idx] + val) /
-                             (count_with_above + 1.0);
-    }
-
-    // Add value
-    counts_[bucket_idx] += 1.0;
-
-    // Decide whether to split
     if (counts_[bucket_idx] < splitThreshold()) {
       return;
     }
 
-    // Split
-    double lower_bound;
-    if (bucket_idx == 0) {
-      lower_bound = getMin();
-    } else {
-      lower_bound = ubounds_[bucket_idx - 1];
-    }
-
-    if (bucket_idx == ubounds_.size()) {
-      double upper_bound = getMax();
-      ubounds_.push_back((lower_bound + upper_bound) / 2.0);
-      counts_[bucket_idx] /= 2.0;
-      counts_.push_back(counts_.back());
-    } else {
-      double upper_bound = ubounds_[bucket_idx];
-
-      ubounds_.push_back(0.0);
-      for (int i = ubounds_.size() - 1; i >= bucket_idx; i--) {
-        ubounds_[i] = ubounds_[i - 1];
-      }
-
-      ubounds_[bucket_idx - 1] = (lower_bound + upper_bound) / 2.0;
-
-      counts_.push_back(0.0);
-      for (int i = counts_.size() - 1; i > bucket_idx; i--) {
-        counts_[i] = counts_[i - 1];
-      }
-      counts_[bucket_idx] /= 2.0;
-      counts_[bucket_idx + 1] = counts_[bucket_idx];
-    }
-
-    // Merge
-    int merge_idx = 0;
-    double merged_count = counts_[0] + counts_[1];
-    for (int i = 1; i < counts_.size() - 1; i++) {
-      double pos_count = counts_[i] + counts_[i + 1];
-      if (pos_count < merged_count) {
-        merge_idx = i;
-        merged_count = pos_count;
-      }
-    }
-
-    for (int i = merge_idx; i < ubounds_.size() - 1; i++) {
-      ubounds_[i] = ubounds_[i + 1];
-    }
-    ubounds_.pop_back();
-
-    counts_[merge_idx] = merged_count;
-    for (int i = merge_idx + 1; i < counts_.size() - 1; i++) {
-      counts_[i] = counts_[i + 1];
-    }
-    counts_.pop_back();
+    split(bucket_idx);
+    merge();
   }
 
   void addRepeatedValue(double val) {}
@@ -134,7 +58,7 @@ public:
                                (ubounds_[idx] - ubounds_[idx - 1]);
   }
 
-  double computeTotalCount() {
+  double computeTotalCount() const {
     double total_count = 0.0;
     for (double count : counts_) {
       total_count += count;
@@ -205,8 +129,12 @@ public:
 
   std::string debugString() const {
     std::string s;
-    s.resize(50 * counts_.size());
+    s.resize(50 * (counts_.size() + 1));
     int cursor = 0;
+
+    cursor += snprintf(&s[cursor], s.size() - cursor,
+                       "generation: %lu\ntotal_count: %lf\n", generation_,
+                       computeTotalCount());
 
     cursor += snprintf(&s[cursor], s.size() - cursor, "  %d [%lf, %lf): %lf\n",
                        0, getMin(), ubounds_[1], counts_[0]);
@@ -227,16 +155,19 @@ public:
     std::string s;
     s.resize((counts_.size() + ubounds_.size() + 2) * 16);
     int cursor = 0;
-    cursor += snprintf(&s[cursor], s.size() - cursor, "{\n  \"bounds\": [%lf, ", getMin());
+    cursor += snprintf(&s[cursor], s.size() - cursor, "{\n  \"bounds\": [%lf, ",
+                       getMin());
     for (auto bound : ubounds_) {
       cursor += snprintf(&s[cursor], s.size() - cursor, "%lf, ", bound);
     }
-    cursor += snprintf(&s[cursor], s.size() - cursor, "%lf],\n  \"counts\": [", getMax());
+    cursor += snprintf(&s[cursor], s.size() - cursor, "%lf],\n  \"counts\": [",
+                       getMax());
 
     for (int i = 0; i < counts_.size() - 1; i++) {
       cursor += snprintf(&s[cursor], s.size() - cursor, "%lf, ", counts_[i]);
     }
-    cursor += snprintf(&s[cursor], s.size() - cursor, "%lf]\n}\n", counts_.back());
+    cursor +=
+        snprintf(&s[cursor], s.size() - cursor, "%lf]\n}\n", counts_.back());
     s.resize(cursor);
     return s;
   }
@@ -248,8 +179,8 @@ protected:
   uint64_t generation_;
 
   // ubounds_ records the upper bound of a bucket. There isn't an upper bound
-  // for the last bucket, so the length of counts_ will generally be one greater than the
-  // length of counts_.
+  // for the last bucket, so the length of counts_ will generally be one greater
+  // than the length of counts_.
   std::vector<double> ubounds_;
   std::vector<double> counts_;
 
@@ -257,12 +188,112 @@ protected:
     double total_count = computeTotalCount();
     return 2 * total_count / getNumBuckets();
   }
+
+  void decay() {
+    for (int i = 0; i < counts_.size(); i++) {
+      counts_[i] = counts_[i] * decay_rate_;
+    }
+  }
+
+  // Adjust bounds and add.
+  // Returns:
+  //   The index of the bucket that the new value landed in.
+  int insert_value(double val) {
+    int bucket_idx;
+    for (bucket_idx = 0; bucket_idx < ubounds_.size(); bucket_idx++) {
+      if (val < ubounds_[bucket_idx]) {
+        break;
+      }
+    }
+
+    if (bucket_idx > 0) {
+      double count_with_below = counts_[bucket_idx - 1] + counts_[bucket_idx];
+      ubounds_[bucket_idx - 1] =
+          (count_with_below * ubounds_[bucket_idx - 1] + val) /
+          (count_with_below + 1.0);
+    }
+
+    if (bucket_idx < ubounds_.size()) {
+      double count_with_above = counts_[bucket_idx] + counts_[bucket_idx + 1];
+      ubounds_[bucket_idx] = (count_with_above * ubounds_[bucket_idx] + val) /
+                             (count_with_above + 1.0);
+    }
+
+    // Add value
+    counts_[bucket_idx] += 1.0;
+
+    return bucket_idx;
+  }
+
+  void split(int bucket_idx) {
+    double lower_bound;
+    if (bucket_idx == 0) {
+      lower_bound = getMin();
+    } else {
+      lower_bound = ubounds_[bucket_idx - 1];
+    }
+
+    if (bucket_idx == ubounds_.size()) {
+      double upper_bound = getMax();
+      ubounds_.push_back((lower_bound + upper_bound) / 2.0);
+      counts_[bucket_idx] /= 2.0;
+      counts_.push_back(counts_.back());
+    } else {
+      double upper_bound = ubounds_[bucket_idx];
+
+      ubounds_.push_back(0.0);
+      for (int i = ubounds_.size() - 1; i > bucket_idx; i--) {
+        ubounds_[i] = ubounds_[i - 1];
+      }
+
+      ubounds_[bucket_idx] = (lower_bound + upper_bound) / 2.0;
+
+      counts_.push_back(0.0);
+      for (int i = counts_.size() - 1; i > bucket_idx; i--) {
+        counts_[i] = counts_[i - 1];
+      }
+      counts_[bucket_idx] /= 2.0;
+      counts_[bucket_idx + 1] = counts_[bucket_idx];
+    }
+  }
+
+  void merge() {
+    int merge_idx = 0;
+    double merged_count = counts_[0] + counts_[1];
+    for (int i = 1; i < counts_.size() - 1; i++) {
+      double pos_count = counts_[i] + counts_[i + 1];
+      if (pos_count < merged_count) {
+        merge_idx = i;
+        merged_count = pos_count;
+      }
+    }
+
+    for (int i = merge_idx; i < ubounds_.size() - 1; i++) {
+      ubounds_[i] = ubounds_[i + 1];
+    }
+    ubounds_.pop_back();
+
+    counts_[merge_idx] = merged_count;
+    for (int i = merge_idx + 1; i < counts_.size() - 1; i++) {
+      counts_[i] = counts_[i + 1];
+    }
+    counts_.pop_back();
+  }
 };
+
+// From https://en.wikipedia.org/wiki/Geometric_series#Formula
+// Args:
+//   a: First term in series.
+//   r: Decay rate.
+//   n: Number of terms in series.
+double exponential_sum(double a, double r, int n) {
+  return a * (1.0 - pow(r, n)) / (1 - r);
+}
 
 TEST(DynamicHistogramTest, addNoDecay) {
   static constexpr int kNumValues = 100;
   static constexpr double kVal = 100.0;
-  DynamicHistogramReference uut(/*decay_rate=*/1.0, 10);
+  DynamicHistogramReference uut(/*decay_rate=*/1.0, /*max_num_buckets=*/10);
 
   for (int i = 0; i < kNumValues; i++) {
     uut.addValue(kVal);
@@ -271,5 +302,21 @@ TEST(DynamicHistogramTest, addNoDecay) {
   }
 
   EXPECT_EQ(uut.computeTotalCount(), kNumValues) << uut.debugString();
-  EXPECT_EQ(uut.getPercentileEstimate(0.5), kVal) << uut.json();
+  EXPECT_EQ(uut.getPercentileEstimate(0.5), kVal) << uut.debugString();
+}
+
+TEST(DynamicHistogramTest, addWithDecay) {
+  static constexpr int kNumValues = 10000;
+  static constexpr double kDecayRate = 0.99;
+  DynamicHistogramReference uut(/*decay_rate=*/kDecayRate,
+                                /*max_num_buckets=*/31);
+  std::default_random_engine gen;
+  std::normal_distribution<double> norm(0.0, 1.0);
+
+  for (int i = 0; i < kNumValues; i++) {
+    uut.addValue(norm(gen));
+  }
+
+  EXPECT_NEAR(uut.computeTotalCount(),
+              exponential_sum(1, kDecayRate, kNumValues), 1e-10);
 }
