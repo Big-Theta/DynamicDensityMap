@@ -1,13 +1,44 @@
+#include <algorithm>
 #include <cstddef>
 #include <random>
 #include <string>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 #include "DynamicHistogram.h"
 
+using testing::ContainerEq;
 using testing::Eq;
+
+bool in_range(double val, double a, double b) {
+  return (val <= a) ^ (val <= b) || val == a || val == b;
+}
+
+TEST(InRange, inRange) {
+  struct tcase {
+    double val;
+    double a;
+    double b;
+    bool in_range_expected;
+  };
+
+  std::vector<struct tcase> cases{
+      {0.0, -1.0, 1.0, true},  {0.0, 1.0, -1.0, true},
+      {1.0, 1.0, -1.0, true},  {1.0, -1.0, 1.0, true},
+      {-1.0, 1.0, -1.0, true}, {-1.0, -1.0, 1.0, true},
+      {2.0, 1.0, -1.0, false}, {-2.0, 1.0, -1.0, false},
+  };
+  for (auto tcase : cases) {
+    EXPECT_THAT(in_range(tcase.val, tcase.a, tcase.b),
+                Eq(tcase.in_range_expected))
+        << "in_range(" << tcase.val << ", " << tcase.a << ", " << tcase.b
+        << ") == " << in_range(tcase.val, tcase.a, tcase.b)
+        << "; expected = " << tcase.in_range_expected;
+    ;
+  }
+}
 
 class DynamicHistogramReference {
 public:
@@ -18,11 +49,21 @@ public:
     counts_.resize(max_num_buckets_);
   }
 
+  DynamicHistogramReference(double decay_rate, size_t max_num_buckets,
+                            const std::vector<double> &quantiles)
+      : DynamicHistogramReference(decay_rate, max_num_buckets) {
+    std::copy(quantiles.begin(), quantiles.end(), back_inserter(quantiles_));
+  }
+
   virtual ~DynamicHistogramReference() {}
 
   void addValue(double val) {
     generation_++;
     decay();
+    // shift_quantiles will treat the new value as a point with mass 1 which
+    // only makes sense after the decay and before the point has been
+    // integrated into the histogram.
+    shift_quantiles(val);
     int bucket_idx = insert_value(val);
 
     if (counts_[bucket_idx] < splitThreshold()) {
@@ -39,7 +80,24 @@ public:
   void copy(const DynamicHistogramReference &other) {}
 
   size_t getNumBuckets() { return counts_.size(); }
-  Bucket getBucketByIndex(size_t idx) { return Bucket(0, 0, 0, 0); }
+
+  Bucket getBucketByIndex(size_t idx) {
+    double min;
+    if (idx > 0) {
+      min = ubounds_[idx - 1];
+    } else {
+      min = getMin();
+    }
+
+    double max;
+    if (idx < ubounds_.size()) {
+      max = ubounds_[idx];
+    } else {
+      max = getMax();
+    }
+
+    return Bucket(/*min=*/min, /*max=*/max, /*count=*/counts_[idx]);
+  }
 
   double getMin() const {
     if (counts_[1] == 0) {
@@ -66,8 +124,13 @@ public:
     return total_count;
   }
 
+  // pct is in [0, 1]
   double getPercentileEstimate(double pct) {
     double total_count = computeTotalCount();
+    if (total_count == 0.0) {
+      return 0.0;
+    }
+
     double cdf = 0.0;
     double next_cdf = 0.0;
     int bucket_idx = 0;
@@ -97,6 +160,14 @@ public:
     }
 
     return frac * (upper_bound - lower_bound) + lower_bound;
+  }
+
+  std::map<double, double> getTrackedQuantiles() {
+    std::map<double, double> qs;
+    for (auto quantile : quantiles_) {
+      qs[quantile] = getPercentileEstimate(quantile);
+    }
+    return qs;
   }
 
   bool isValid() const {
@@ -183,6 +254,7 @@ protected:
   // than the length of counts_.
   std::vector<double> ubounds_;
   std::vector<double> counts_;
+  std::vector<double> quantiles_;
 
   double splitThreshold() {
     double total_count = computeTotalCount();
@@ -279,6 +351,30 @@ protected:
     }
     counts_.pop_back();
   }
+
+  void shift_quantiles(double val) {
+    for (auto quantile : quantiles_) {
+
+    }
+  }
+
+  // Shifts the quantile inside the bucket. Returns the amount that remains to
+  // be shifted. If 0, the shift is done.
+  double shift_quantile_in_bucket(int quantile_idx, int bucket_idx, double val,
+                                  double shift_remaining) {
+    if (shift_remaining == 0.0) {
+      return 0.0;
+    }
+
+    Bucket bucket = getBucketByIndex(bucket_idx);
+
+    double target_location = quantiles_[quantile_idx] + shift_remaining *
+                                                            bucket.diameter() /
+                                                            bucket.count();
+
+    assert(false);
+    return 0.0;
+  }
 };
 
 // From https://en.wikipedia.org/wiki/Geometric_series#Formula
@@ -306,8 +402,10 @@ TEST(DynamicHistogramTest, addNoDecay) {
 }
 
 TEST(DynamicHistogramTest, addWithDecay) {
-  static constexpr int kNumValues = 10000;
-  static constexpr double kDecayRate = 0.99;
+  static constexpr int kNumValues = 100000;
+  static constexpr double kDecayRate = 0.9999;
+  static constexpr double kMean = 0.0;
+  static constexpr double kStdDev = 1.0;
   DynamicHistogramReference uut(/*decay_rate=*/kDecayRate,
                                 /*max_num_buckets=*/31);
   std::default_random_engine gen;
@@ -319,4 +417,47 @@ TEST(DynamicHistogramTest, addWithDecay) {
 
   EXPECT_NEAR(uut.computeTotalCount(),
               exponential_sum(1, kDecayRate, kNumValues), 1e-10);
+
+  // Using R:
+  // $ R -q
+  // > qnorm(0.5, 0, 1)
+  // [1] 0
+  // > qnorm(0.05, 0, 1)
+  // [1] -1.644854
+  // > qnorm(0.95, 0, 1)
+  // [1] 1.644854
+  EXPECT_NEAR(uut.getPercentileEstimate(0.5), 0.0, 1e-1);
+  EXPECT_NEAR(uut.getPercentileEstimate(0.05), -1.644854, 1e-1);
+  EXPECT_NEAR(uut.getPercentileEstimate(0.95), 1.644854, 1e-1);
+}
+
+TEST(DynamicHistogramTest, addRandomNoDecay) {
+  static constexpr int kNumValues = 100000;
+  DynamicHistogramReference uut(/*decay_rate=*/1.0,
+                                /*max_num_buckets=*/31);
+  std::default_random_engine gen;
+  std::normal_distribution<double> norm(0.0, 1.0);
+
+  for (int i = 0; i < kNumValues; i++) {
+    uut.addValue(norm(gen));
+  }
+
+  EXPECT_NEAR(uut.getPercentileEstimate(0.5), 0.0, 1e-1);
+  EXPECT_NEAR(uut.getPercentileEstimate(0.05), -1.644854, 1e-1);
+  EXPECT_NEAR(uut.getPercentileEstimate(0.95), 1.644854, 1e-1);
+}
+
+TEST(DynamicHistogramTest, quantilesConstructor) {
+  DynamicHistogramReference uut(
+      /*decay_rate=*/0.9999, /*max_num_buckets=*/31,
+      /*quantiles=*/std::vector<double>({0.01, 0.1, 0.25, 0.5, 0.9, 0.99}));
+
+  std::map<double, double> quantiles = uut.getTrackedQuantiles();
+  EXPECT_THAT(uut.getTrackedQuantiles(),
+              ContainerEq(std::map<double, double>{{0.01, 0.0},
+                                                   {0.1, 0.0},
+                                                   {0.25, 0.0},
+                                                   {0.5, 0.0},
+                                                   {0.9, 0.0},
+                                                   {0.99, 0.0}}));
 }
