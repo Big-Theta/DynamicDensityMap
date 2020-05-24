@@ -1,6 +1,10 @@
 #ifndef DYNAMIC_HISTOGRAM_H
 #define DYNAMIC_HISTOGRAM_H
 
+namespace dhist {
+
+bool in_range(double val, double a, double b);
+
 class Bucket {
 public:
   // Represents data in the half-open interval [min, max).
@@ -22,5 +26,7 @@ private:
 };
 
 int foo();
+
+}
 
 #endif  // DYNAMIC_HISTOGRAM_H

@@ -1,5 +1,9 @@
 #include "DynamicHistogram.h"
 
-int foo() {
-  return 42;
+namespace dhist {
+
+bool in_range(double val, double a, double b) {
+  return ((val <= a) ^ (val <= b)) || val == a || val == b;
 }
+
+} // namespace dhist

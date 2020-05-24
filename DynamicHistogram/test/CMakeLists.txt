@@ -1,14 +1,15 @@
-set(BINARY ${CMAKE_PROJECT_NAME}_test)
+set(TEST ${CMAKE_PROJECT_NAME}_test)
+file(GLOB_RECURSE TEST_SOURCES LIST_DIRECTORIES false *.h DynamicHistogramTest.cpp DynamicHistogram.cpp main.cpp)
+add_executable(${TEST} ${TEST_SOURCES})
+target_link_libraries(${TEST} PUBLIC ${CMAKE_PROJECT_NAME}_lib gmock gtest)
+add_test(NAME ${TEST} COMMAND ${TEST})
 
-file(GLOB_RECURSE TEST_SOURCES LIST_DIRECTORIES false *.h *.cpp)
+set(BENCHMARK ${CMAKE_PROJECT_NAME}_benchmark)
+file(GLOB_RECURSE BENCHMARK_SOURCES LIST_DIRECTORIES false *.h DynamicHistogramBenchmark.cpp)
+add_executable(${BENCHMARK} ${BENCHMARK_SOURCES})
+target_link_libraries(${BENCHMARK} PUBLIC ${CMAKE_PROJECT_NAME}_lib benchmark)
 
 set(SOURCES ${TEST_SOURCES})
-
-add_executable(${BINARY} ${TEST_SOURCES})
-
-add_test(NAME ${BINARY} COMMAND ${BINARY})
-
-target_link_libraries(${BINARY} PUBLIC ${CMAKE_PROJECT_NAME}_lib benchmark gmock gtest)
 
 set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
