@@ -10,6 +10,7 @@
 #include "DynamicHistogram.h"
 #include "DynamicHistogramReference.h"
 
+using dhist::DynamicHistogram;
 using dhist::DynamicHistogramReference;
 using dhist::in_range;
 using testing::ContainerEq;
@@ -48,7 +49,7 @@ double exponential_sum(double a, double r, int n) {
   return a * (1.0 - pow(r, n)) / (1 - r);
 }
 
-TEST(DynamicHistogramTest, addNoDecay) {
+TEST(ReferenceTest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
   static constexpr double kMean = 0.0;
@@ -68,7 +69,7 @@ TEST(DynamicHistogramTest, addNoDecay) {
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
 }
 
-TEST(DynamicHistogramTest, addWithDecay) {
+TEST(ReferenceTest, addWithDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.00001;
   static constexpr double kMean = 0.0;
@@ -98,7 +99,7 @@ TEST(DynamicHistogramTest, addWithDecay) {
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
 }
 
-TEST(DynamicHistogramTest, addRandomNoDecay) {
+TEST(ReferenceTest, addRandomNoDecay) {
   static constexpr int kNumValues = 100000;
   DynamicHistogramReference uut(/*decay_rate=*/0.0,
                                 /*max_num_buckets=*/31);
@@ -114,7 +115,7 @@ TEST(DynamicHistogramTest, addRandomNoDecay) {
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
 }
 
-TEST(DynamicHistogramTest, trackQuantiles) {
+TEST(ReferenceTest, trackQuantiles) {
   static constexpr int kNumValues = 1000000;
   DynamicHistogramReference uut(
       /*decay_rate=*/0.0, /*max_num_buckets=*/4,
@@ -133,7 +134,7 @@ TEST(DynamicHistogramTest, trackQuantiles) {
                                                    {0.99, 0.99}}));
 }
 
-TEST(DynamicHistogramTest, quantilesTracking) {
+TEST(ReferenceTest, quantilesTracking) {
   static constexpr int kNumValues = 100000;
   DynamicHistogramReference uut(
       /*decay_rate=*/0.0, /*max_num_buckets=*/31);
@@ -158,4 +159,26 @@ TEST(DynamicHistogramTest, quantilesTracking) {
   for (const auto &kv : uut.getTrackedQuantiles()) {
     EXPECT_NEAR(kv.first, kv.second, 0.01);
   }
+}
+
+TEST(DynamicHistogramTest, addNoDecay) {
+  static constexpr int kNumValues = 100000;
+  static constexpr double kDecayRate = 0.0;
+  static constexpr double kMean = 0.0;
+  static constexpr double kStdDev = 1.0;
+  DynamicHistogram uut(/*decay_rate=*/kDecayRate,
+                       /*max_num_buckets=*/31);
+  std::default_random_engine gen;
+  std::normal_distribution<double> norm(0.0, 1.0);
+
+  for (int i = 0; i < kNumValues; i++) {
+    uut.addValue(norm(gen));
+  }
+
+  EXPECT_EQ(uut.computeTotalCount(), kNumValues);
+  EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1) << uut.debugString();
+  EXPECT_NEAR(uut.getQuantileEstimate(0.05), -1.644854, 1e-1)
+      << uut.debugString();
+  EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1)
+      << uut.debugString();
 }

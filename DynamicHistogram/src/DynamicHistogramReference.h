@@ -33,7 +33,7 @@ public:
     // only makes sense after the decay and before the point has been
     // integrated into the histogram.
     shift_quantiles(val);
-    int bucket_idx = insert_value(val);
+    int bucket_idx = insertValue(val);
 
     if (counts_[bucket_idx] < splitThreshold()) {
       return;
@@ -85,7 +85,7 @@ public:
     return Bucket(/*min=*/min, /*max=*/max, /*count=*/counts_[idx]);
   }
 
-  double getBucketIndexByValue(double val) const {
+  int getBucketIndexByValue(double val) const {
     int bucket_idx = 0;
     for (; bucket_idx < ubounds_.size(); bucket_idx++) {
       if (val < ubounds_[bucket_idx]) {
@@ -284,7 +284,7 @@ protected:
   // Adjust bounds and add.
   // Returns:
   //   The index of the bucket that the new value landed in.
-  int insert_value(double val) {
+  int insertValue(double val) {
     int bucket_idx = getBucketIndexByValue(val);
     if (bucket_idx > 0) {
       double count_with_below = counts_[bucket_idx - 1] + counts_[bucket_idx];
