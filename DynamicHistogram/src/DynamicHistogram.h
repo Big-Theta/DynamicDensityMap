@@ -34,11 +34,13 @@ private:
 };
 
 
+template <bool useDecay, bool threadsafe>
 class DynamicHistogram {
 public:
   DynamicHistogram(double decay_rate, size_t max_num_buckets)
-      : use_decay_(decay_rate > 0.0), decay_rate_(decay_rate),
-        max_num_buckets_(max_num_buckets), generation_(0) {
+      : decay_rate_(decay_rate), max_num_buckets_(max_num_buckets),
+        generation_(0), total_count_(0.0) {
+    assert(useDecay == (decay_rate != 0.0));
     ubounds_.resize(max_num_buckets_ - 1);
     counts_.resize(max_num_buckets_);
     bucket_generation_.resize(max_num_buckets_);
@@ -54,6 +56,12 @@ public:
     // integrated into the histogram.
     //shift_quantiles(val);
     int bx = insertValue(val);
+
+    if (useDecay) {
+      total_count_ = total_count_ * (1.0 - decay_rate_) + 1.0;
+    } else {
+      total_count_ = generation_;
+    }
 
     if (counts_[bx] < splitThreshold()) {
       return;
@@ -81,8 +89,24 @@ public:
 
   size_t getNumBuckets() { return counts_.size(); }
 
-  Bucket getBucketByIndex(size_t idx) const {
-    return Bucket(0, 0, 0);
+  Bucket getBucketByIndex(size_t bx) {
+    double min;
+    if (bx > 0) {
+      min = ubounds_[bx - 1];
+    } else {
+      min = getMin();
+    }
+
+    double max;
+    if (bx < ubounds_.size()) {
+      max = ubounds_[bx];
+    } else {
+      max = getMax();
+    }
+
+    decay(bx);
+
+    return Bucket(/*min=*/min, /*max=*/max, /*count=*/counts_[bx]);
   }
 
   int getBucketIndexByValue(double val) const {
@@ -108,22 +132,16 @@ public:
                                (ubounds_[bx] - ubounds_[bx - 1]);
   }
 
-  double computeTotalCount() const {
-    if (!use_decay_) {
-      return generation_;
-    }
-    printf("> computeTotalCount: 1.0 - pow(%lf, %ld)) / (1 - %lf) == %lf\n",
-           decay_rate_, generation_, decay_rate_,
-           (1.0 - pow(1 - decay_rate_, generation_)) / (1 - decay_rate_));
-    return (1.0 - pow(1 - decay_rate_, generation_)) / (1 - decay_rate_);
+  double computeTotalCount() {
+    decayAll();
+    return total_count_;
   }
 
   // quantile is in [0, 1]
   double getQuantileEstimate(double quantile) {
     decayAll();
 
-    double total_count = computeTotalCount();
-    if (total_count == 0.0) {
+    if (total_count_ == 0.0) {
       return 0.0;
     }
 
@@ -131,7 +149,7 @@ public:
     double next_cdf = 0.0;
     int bx = 0;
     for (int i = 0; i < counts_.size(); i++) {
-      next_cdf = cdf + counts_[i] / total_count;
+      next_cdf = cdf + counts_[i] / total_count_;
       if (next_cdf > quantile) {
         bx = i;
         break;
@@ -213,11 +231,11 @@ public:
   }
 
 protected:
-  const bool use_decay_;
   const double decay_rate_;
   const size_t max_num_buckets_;
 
   uint64_t generation_;
+  double total_count_;
 
   // ubounds_ records the upper bound of a bucket. There isn't an upper bound
   // for the last bucket, so the length of counts_ will generally be one greater
@@ -229,28 +247,27 @@ protected:
   std::vector<double> quantile_locations_;
 
   double splitThreshold() {
-    double total_count = computeTotalCount();
-    return 2 * total_count / getNumBuckets();
+    return 2 * total_count_ / getNumBuckets();
   }
 
-  double computeDecay(double original, uint64_t generations) {
-    if (!use_decay_) {
+  double countAfterDecay(double original, uint64_t generations) {
+    if (!useDecay) {
       return original;
     }
-    printf("> computeDecay(%lf, %ld) == %lf\n", original, generations,
-           original * pow(decay_rate_, generations));
-    return original * pow(decay_rate_, generations);
+    return original * pow(1.0 - decay_rate_, generations);
   }
 
   void decay(int bx) {
     counts_[bx] =
-        computeDecay(counts_[bx], generation_ - bucket_generation_[bx]);
+        countAfterDecay(counts_[bx], generation_ - bucket_generation_[bx]);
     bucket_generation_[bx] = generation_;
   }
 
   void decayAll() {
+    total_count_ = 0.0;
     for (int bx = 0; bx < counts_.size(); bx++) {
       decay(bx);
+      total_count_ += counts_[bx];
     }
   }
 

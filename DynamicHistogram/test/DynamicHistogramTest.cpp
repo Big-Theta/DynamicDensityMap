@@ -166,8 +166,9 @@ TEST(DynamicHistogramTest, addNoDecay) {
   static constexpr double kDecayRate = 0.0;
   static constexpr double kMean = 0.0;
   static constexpr double kStdDev = 1.0;
-  DynamicHistogram uut(/*decay_rate=*/kDecayRate,
-                       /*max_num_buckets=*/31);
+  DynamicHistogram</*useDecay=*/false, /*threadsafe=*/false> uut(
+      /*decay_rate=*/kDecayRate,
+      /*max_num_buckets=*/31);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -176,9 +177,76 @@ TEST(DynamicHistogramTest, addNoDecay) {
   }
 
   EXPECT_EQ(uut.computeTotalCount(), kNumValues);
-  EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1) << uut.debugString();
+  EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1);
   EXPECT_NEAR(uut.getQuantileEstimate(0.05), -1.644854, 1e-1)
       << uut.debugString();
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1)
       << uut.debugString();
+}
+
+TEST(DynamicHistogramTest, addWithDecay) {
+  static constexpr int kNumValues = 100000;
+  static constexpr double kDecayRate = 0.00001;
+  static constexpr double kMean = 0.0;
+  static constexpr double kStdDev = 1.0;
+  DynamicHistogram</*useDecay=*/true, /*threadsafe=*/false> uut(
+      /*decay_rate=*/kDecayRate,
+      /*max_num_buckets=*/31);
+  std::default_random_engine gen;
+  std::normal_distribution<double> norm(0.0, 1.0);
+
+  for (int i = 0; i < kNumValues; i++) {
+    uut.addValue(norm(gen));
+  }
+
+  EXPECT_NEAR(uut.computeTotalCount(),
+              exponential_sum(1, 1 - kDecayRate, kNumValues), 1e-6);
+
+  // Using R:
+  // $ R -q
+  // > qnorm(0.5, 0, 1)
+  // [1] 0
+  // > qnorm(0.05, 0, 1)
+  // [1] -1.644854
+  // > qnorm(0.95, 0, 1)
+  // [1] 1.644854
+  EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1) << uut.debugString();
+  EXPECT_NEAR(uut.getQuantileEstimate(0.05), -1.644854, 1e-1);
+  EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
+}
+
+TEST(DynamicHistogramTest, referenceEquivalence) {
+  static constexpr double kDecayRate = 0.0001;
+  static constexpr int kMaxNumBuckets = 31;
+  static constexpr int kNumValues = 100000;
+
+  DynamicHistogramReference ref(/*decay_rate=*/kDecayRate,
+                                /*max_num_buckets=*/kMaxNumBuckets);
+  DynamicHistogram</*useDecay=*/true, /*threadsafe=*/false> dyn(
+      /*decay_rate=*/kDecayRate,
+      /*max_num_buckets=*/kMaxNumBuckets);
+
+  std::default_random_engine gen;
+  gen.seed(1);
+  std::normal_distribution<double> norm(0.0, 1.0);
+  for (int i = 0; i < kNumValues; i++) {
+    double val = norm(gen);
+    ref.addValue(val);
+    dyn.addValue(val);
+  }
+
+  EXPECT_NEAR(ref.computeTotalCount(), dyn.computeTotalCount(), 1e-10);
+  for (int i = 1; i < 100; i++) {
+    EXPECT_NEAR(ref.getQuantileEstimate(i / 100.0),
+                dyn.getQuantileEstimate(i / 100.0), 1e-10);
+  }
+
+  EXPECT_EQ(ref.getNumBuckets(), dyn.getNumBuckets());
+  for (int bx = 0; bx < ref.getNumBuckets(); bx++) {
+    auto ref_bucket = ref.getBucketByIndex(bx);
+    auto dyn_bucket = dyn.getBucketByIndex(bx);
+    EXPECT_NEAR(ref_bucket.min(), dyn_bucket.min(), 1e-10);
+    EXPECT_NEAR(ref_bucket.max(), dyn_bucket.max(), 1e-10);
+    EXPECT_NEAR(ref_bucket.count(), dyn_bucket.count(), 1e-10);
+  }
 }
