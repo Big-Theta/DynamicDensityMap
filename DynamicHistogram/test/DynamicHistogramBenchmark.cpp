@@ -33,7 +33,7 @@ static void BM_ReferenceAdd(benchmark::State &state) {
 }
 BENCHMARK(BM_ReferenceAdd)->Arg(0)->Arg(1);
 
-static void BM_AddDecay(benchmark::State &state) {
+template <class T> void BM_AddDecay(benchmark::State &state) {
   std::vector<double> vals;
   std::default_random_engine gen;
   std::uniform_real_distribution<double> unif(0.0, 1.0);
@@ -44,9 +44,8 @@ static void BM_AddDecay(benchmark::State &state) {
 
   double decay_rate = 0.0001;
 
-  dhist::DynamicHistogram</*use_decay=*/true, /*threadsafe=*/false> uut(
-      /*decay_rate=*/decay_rate,
-      /*max_num_buckets=*/31);
+  T uut(/*decay_rate=*/decay_rate,
+        /*max_num_buckets=*/31);
 
   int i = 0;
   int size = vals.size();
@@ -59,9 +58,24 @@ static void BM_AddDecay(benchmark::State &state) {
     uut.addValue(vals[i]);
   }
 }
-BENCHMARK(BM_AddDecay);
+BENCHMARK_TEMPLATE(
+    BM_AddDecay,
+    dhist::DynamicHistogram</*useDecay=*/true,
+                            /*useInsertQueue=*/true, /*threadsafe=*/true>);
+BENCHMARK_TEMPLATE(
+    BM_AddDecay,
+    dhist::DynamicHistogram</*useDecay=*/true,
+                            /*useInsertQueue=*/false, /*threadsafe=*/true>);
+BENCHMARK_TEMPLATE(
+    BM_AddDecay,
+    dhist::DynamicHistogram</*useDecay=*/true,
+                            /*useInsertQueue=*/true, /*threadsafe=*/false>);
+BENCHMARK_TEMPLATE(
+    BM_AddDecay,
+    dhist::DynamicHistogram</*useDecay=*/true,
+                            /*useInsertQueue=*/false, /*threadsafe=*/false>);
 
-static void BM_AddNoDecay(benchmark::State &state) {
+template <class T> void BM_AddNoDecay(benchmark::State &state) {
   std::vector<double> vals;
   std::default_random_engine gen;
   std::uniform_real_distribution<double> unif(0.0, 1.0);
@@ -72,9 +86,8 @@ static void BM_AddNoDecay(benchmark::State &state) {
 
   double decay_rate = 0.0;
 
-  dhist::DynamicHistogram</*use_decay=*/false, /*threadsafe=*/false> uut(
-      /*decay_rate=*/decay_rate,
-      /*max_num_buckets=*/31);
+  T uut(/*decay_rate=*/decay_rate,
+        /*max_num_buckets=*/31);
 
   int i = 0;
   int size = vals.size();
@@ -87,6 +100,21 @@ static void BM_AddNoDecay(benchmark::State &state) {
     uut.addValue(vals[i]);
   }
 }
-BENCHMARK(BM_AddNoDecay);
+BENCHMARK_TEMPLATE(
+    BM_AddNoDecay,
+    dhist::DynamicHistogram</*useDecay=*/false,
+                            /*useInsertQueue=*/true, /*threadsafe=*/true>);
+BENCHMARK_TEMPLATE(
+    BM_AddNoDecay,
+    dhist::DynamicHistogram</*useDecay=*/false,
+                            /*useInsertQueue=*/false, /*threadsafe=*/true>);
+BENCHMARK_TEMPLATE(
+    BM_AddNoDecay,
+    dhist::DynamicHistogram</*useDecay=*/false,
+                            /*useInsertQueue=*/true, /*threadsafe=*/false>);
+BENCHMARK_TEMPLATE(
+    BM_AddNoDecay,
+    dhist::DynamicHistogram</*useDecay=*/false,
+                            /*useInsertQueue=*/false, /*threadsafe=*/false>);
 
 BENCHMARK_MAIN();

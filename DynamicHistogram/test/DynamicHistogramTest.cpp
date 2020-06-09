@@ -15,6 +15,7 @@ using dhist::DynamicHistogramReference;
 using dhist::in_range;
 using testing::ContainerEq;
 using testing::Eq;
+using testing::Types;
 
 TEST(InRange, in_range) {
   struct tcase {
@@ -84,7 +85,7 @@ TEST(ReferenceTest, addWithDecay) {
   }
 
   EXPECT_NEAR(uut.computeTotalCount(),
-              exponential_sum(1, 1 - kDecayRate, kNumValues), 1e-10);
+              exponential_sum(1, 1 - kDecayRate, kNumValues), 1e-6);
 
   // Using R:
   // $ R -q
@@ -166,9 +167,11 @@ TEST(DynamicHistogramTest, addNoDecay) {
   static constexpr double kDecayRate = 0.0;
   static constexpr double kMean = 0.0;
   static constexpr double kStdDev = 1.0;
-  DynamicHistogram</*useDecay=*/false, /*threadsafe=*/false> uut(
-      /*decay_rate=*/kDecayRate,
-      /*max_num_buckets=*/31);
+  DynamicHistogram</*useDecay=*/false, /*useInsertQueue=*/true,
+                   /*threadsafe=*/false>
+      uut(
+          /*decay_rate=*/kDecayRate,
+          /*max_num_buckets=*/31);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -189,9 +192,11 @@ TEST(DynamicHistogramTest, addWithDecay) {
   static constexpr double kDecayRate = 0.00001;
   static constexpr double kMean = 0.0;
   static constexpr double kStdDev = 1.0;
-  DynamicHistogram</*useDecay=*/true, /*threadsafe=*/false> uut(
-      /*decay_rate=*/kDecayRate,
-      /*max_num_buckets=*/31);
+  DynamicHistogram</*useDecay=*/true, /*useInsertQueue=*/true,
+                   /*threadsafe=*/false>
+      uut(
+          /*decay_rate=*/kDecayRate,
+          /*max_num_buckets=*/31);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -215,16 +220,38 @@ TEST(DynamicHistogramTest, addWithDecay) {
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
 }
 
-TEST(DynamicHistogramTest, referenceEquivalence) {
+struct TypedTestTrue {
+  static constexpr bool val = true;
+};
+
+struct TypedTestFalse {
+  static constexpr bool val = false;
+};
+
+template <typename T>
+class DynamicHistogramTypedTest : public testing::Test {};
+
+using test_types = testing::Types<std::pair<TypedTestTrue, TypedTestTrue>,
+                                  std::pair<TypedTestTrue, TypedTestFalse>,
+                                  std::pair<TypedTestFalse, TypedTestTrue>,
+                                  std::pair<TypedTestFalse, TypedTestFalse>>;
+TYPED_TEST_SUITE(DynamicHistogramTypedTest, test_types);
+
+TYPED_TEST(DynamicHistogramTypedTest, referenceEquivalence) {
   static constexpr double kDecayRate = 0.0001;
   static constexpr int kMaxNumBuckets = 31;
   static constexpr int kNumValues = 100000;
 
+  typename TypeParam::first_type param1;
+  typename TypeParam::second_type param2;
+
   DynamicHistogramReference ref(/*decay_rate=*/kDecayRate,
                                 /*max_num_buckets=*/kMaxNumBuckets);
-  DynamicHistogram</*useDecay=*/true, /*threadsafe=*/false> dyn(
-      /*decay_rate=*/kDecayRate,
-      /*max_num_buckets=*/kMaxNumBuckets);
+  DynamicHistogram</*useDecay=*/true,
+                   /*useInsertQueue=*/param1.val,
+                   /*threadsafe=*/param2.val>
+      dyn(/*decay_rate=*/kDecayRate,
+          /*max_num_buckets=*/kMaxNumBuckets);
 
   std::default_random_engine gen;
   gen.seed(1);
@@ -235,18 +262,18 @@ TEST(DynamicHistogramTest, referenceEquivalence) {
     dyn.addValue(val);
   }
 
-  EXPECT_NEAR(ref.computeTotalCount(), dyn.computeTotalCount(), 1e-10);
+  EXPECT_NEAR(ref.computeTotalCount(), dyn.computeTotalCount(), 1e-6);
   for (int i = 1; i < 100; i++) {
     EXPECT_NEAR(ref.getQuantileEstimate(i / 100.0),
-                dyn.getQuantileEstimate(i / 100.0), 1e-10);
+                dyn.getQuantileEstimate(i / 100.0), 1e-6);
   }
 
   EXPECT_EQ(ref.getNumBuckets(), dyn.getNumBuckets());
   for (int bx = 0; bx < ref.getNumBuckets(); bx++) {
     auto ref_bucket = ref.getBucketByIndex(bx);
     auto dyn_bucket = dyn.getBucketByIndex(bx);
-    EXPECT_NEAR(ref_bucket.min(), dyn_bucket.min(), 1e-10);
-    EXPECT_NEAR(ref_bucket.max(), dyn_bucket.max(), 1e-10);
-    EXPECT_NEAR(ref_bucket.count(), dyn_bucket.count(), 1e-10);
+    EXPECT_NEAR(ref_bucket.min(), dyn_bucket.min(), 1e-6);
+    EXPECT_NEAR(ref_bucket.max(), dyn_bucket.max(), 1e-6);
+    EXPECT_NEAR(ref_bucket.count(), dyn_bucket.count(), 1e-6);
   }
 }

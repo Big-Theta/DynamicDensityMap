@@ -34,42 +34,49 @@ private:
 };
 
 
-template <bool useDecay, bool threadsafe>
+template <bool useDecay=true, bool useInsertQueue=true, bool threadsafe=true>
 class DynamicHistogram {
 public:
-  DynamicHistogram(double decay_rate, size_t max_num_buckets)
+  DynamicHistogram(double decay_rate, size_t max_num_buckets,
+                   int queue_size = 256)
       : decay_rate_(decay_rate), max_num_buckets_(max_num_buckets),
-        generation_(0), total_count_(0.0) {
+        queue_size_(256), generation_(0), refresh_generation_(0),
+        total_count_(0.0), insert_queue_begin_(0), insert_queue_end_(0) {
     assert(useDecay == (decay_rate != 0.0));
     ubounds_.resize(max_num_buckets_ - 1);
     counts_.resize(max_num_buckets_);
     bucket_generation_.resize(max_num_buckets_);
+    insert_queue_.resize(queue_size_);
+
+    if (useDecay) {
+      decay_factors_.resize(queue_size_);
+      double decay = 1.0;
+      for (int i = 0; i < queue_size_; i++) {
+        decay_factors_[i] = decay;
+        decay *= 1.0 - decay_rate_;
+      }
+    }
   }
 
   virtual ~DynamicHistogram() {}
 
   void addValue(double val) {
-    generation_++;
-    //decay();
-    // shift_quantiles will treat the new value as a point with mass 1 which
-    // only makes sense after the decay and before the point has been
-    // integrated into the histogram.
-    //shift_quantiles(val);
-    int bx = insertValue(val);
+    if (useInsertQueue) {
+      insert_queue_[insert_queue_end_] = val;
+      insert_queue_end_++;
+      if (insert_queue_end_ == insert_queue_.size()) {
+        insert_queue_end_ = 0;
+      }
 
-    if (useDecay) {
-      total_count_ = total_count_ * (1.0 - decay_rate_) + 1.0;
+      if (insert_queue_count() + 1 == insert_queue_.size()) {
+        flush();
+      }
     } else {
-      total_count_ = generation_;
+      addValueLocked(val);
+      if (generation_ - refresh_generation_ + 1 == queue_size_) {
+        refresh();
+      }
     }
-
-    if (counts_[bx] < splitThreshold()) {
-      return;
-    }
-
-    decayAll();
-    split(bx);
-    merge();
   }
 
   void addRepeatedValue(double val, uint64_t nValues) {
@@ -133,13 +140,13 @@ public:
   }
 
   double computeTotalCount() {
-    decayAll();
+    flush();
     return total_count_;
   }
 
   // quantile is in [0, 1]
   double getQuantileEstimate(double quantile) {
-    decayAll();
+    flush();
 
     if (total_count_ == 0.0) {
       return 0.0;
@@ -184,7 +191,7 @@ public:
   }
 
   std::string debugString() {
-    decayAll();
+    refresh();
     std::string s;
     s.resize(50 * (counts_.size() + 1));
     int cursor = 0;
@@ -209,7 +216,7 @@ public:
   }
 
   std::string json() {
-    decayAll();
+    refresh();
     std::string s;
     s.resize((counts_.size() + ubounds_.size() + 2) * 16);
     int cursor = 0;
@@ -233,9 +240,13 @@ public:
 protected:
   const double decay_rate_;
   const size_t max_num_buckets_;
+  const int queue_size_;
 
   uint64_t generation_;
+  uint64_t refresh_generation_;
   double total_count_;
+  int insert_queue_begin_;
+  int insert_queue_end_;
 
   // ubounds_ records the upper bound of a bucket. There isn't an upper bound
   // for the last bucket, so the length of counts_ will generally be one greater
@@ -243,8 +254,58 @@ protected:
   std::vector<double> ubounds_;
   std::vector<double> counts_;
   std::vector<uint64_t> bucket_generation_;
+  std::vector<double> insert_queue_;
   std::vector<double> quantiles_;
   std::vector<double> quantile_locations_;
+  std::vector<double> decay_factors_;
+
+  int insert_queue_count() const {
+    int size = insert_queue_end_ - insert_queue_begin_;
+    if (size < 0) {
+      size += insert_queue_.size();
+    }
+    return size;
+  }
+
+  void flush() {
+    const int qx_end = insert_queue_end_;
+    const int size = insert_queue_.size();
+    int qx = insert_queue_begin_;
+    while (qx != qx_end) {
+      addValueLocked(insert_queue_[qx]);
+      qx++;
+      if (qx == size) {
+        qx = 0;
+      }
+    }
+    insert_queue_begin_ = qx;
+    refresh();
+  }
+
+  void addValueLocked(double val) {
+    generation_++;
+
+    //decay();
+    // shift_quantiles will treat the new value as a point with mass 1 which
+    // only makes sense after the decay and before the point has been
+    // integrated into the histogram.
+    //shift_quantiles(val);
+    int bx = insertValue(val);
+
+    if (useDecay) {
+      total_count_ = total_count_ * (1.0 - decay_rate_) + 1.0;
+    } else {
+      total_count_ = generation_;
+    }
+
+    if (counts_[bx] < splitThreshold()) {
+      return;
+    }
+
+    refresh();
+    split(bx);
+    merge();
+  }
 
   double splitThreshold() {
     return 2 * total_count_ / getNumBuckets();
@@ -254,21 +315,32 @@ protected:
     if (!useDecay) {
       return original;
     }
-    return original * pow(1.0 - decay_rate_, generations);
+    // This invariant should be maintained by addValue calling refresh()
+    // periodically.
+    assert(generations < decay_factors_.size());
+    return original * decay_factors_[generations];
   }
 
   void decay(int bx) {
+    if (!useDecay) {
+      return;
+    }
     counts_[bx] =
         countAfterDecay(counts_[bx], generation_ - bucket_generation_[bx]);
     bucket_generation_[bx] = generation_;
   }
 
-  void decayAll() {
+  void refresh() {
+    if (refresh_generation_ == generation_) {
+      return;
+    }
+
     total_count_ = 0.0;
     for (int bx = 0; bx < counts_.size(); bx++) {
       decay(bx);
       total_count_ += counts_[bx];
     }
+    refresh_generation_ = generation_;
   }
 
   // Adjust bounds and add.
@@ -281,21 +353,22 @@ protected:
 
     decay(bx);
 
+    double count_bx = counts_[bx];
     if (bx > 0) {
       decay(bx - 1);
-      double count_with_below = counts_[bx - 1] + counts_[bx];
+      double count_with_below = counts_[bx - 1] + count_bx;
       ubounds_[bx - 1] = (count_with_below * ubounds_[bx - 1] + val) /
                          (count_with_below + 1.0);
     }
 
     if (bx < ubounds_.size()) {
       decay(bx + 1);
-      double count_with_above = counts_[bx] + counts_[bx + 1];
+      double count_with_above = count_bx + counts_[bx + 1];
       ubounds_[bx] =
           (count_with_above * ubounds_[bx] + val) / (count_with_above + 1.0);
     }
 
-    counts_[bx] += 1;
+    counts_[bx] = count_bx + 1;
 
     return bx;
   }
