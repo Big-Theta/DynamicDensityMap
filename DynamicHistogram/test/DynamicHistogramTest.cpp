@@ -167,11 +167,9 @@ TEST(DynamicHistogramTest, addNoDecay) {
   static constexpr double kDecayRate = 0.0;
   static constexpr double kMean = 0.0;
   static constexpr double kStdDev = 1.0;
-  DynamicHistogram</*useDecay=*/false, /*useInsertQueue=*/true,
-                   /*threadsafe=*/false>
-      uut(
-          /*decay_rate=*/kDecayRate,
-          /*max_num_buckets=*/31);
+  DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/false> uut(
+      /*decay_rate=*/kDecayRate,
+      /*max_num_buckets=*/31);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -192,11 +190,9 @@ TEST(DynamicHistogramTest, addWithDecay) {
   static constexpr double kDecayRate = 0.00001;
   static constexpr double kMean = 0.0;
   static constexpr double kStdDev = 1.0;
-  DynamicHistogram</*useDecay=*/true, /*useInsertQueue=*/true,
-                   /*threadsafe=*/false>
-      uut(
-          /*decay_rate=*/kDecayRate,
-          /*max_num_buckets=*/31);
+  DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/false> uut(
+      /*decay_rate=*/kDecayRate,
+      /*max_num_buckets=*/31);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -231,10 +227,7 @@ struct TypedTestFalse {
 template <typename T>
 class DynamicHistogramTypedTest : public testing::Test {};
 
-using test_types = testing::Types<std::pair<TypedTestTrue, TypedTestTrue>,
-                                  std::pair<TypedTestTrue, TypedTestFalse>,
-                                  std::pair<TypedTestFalse, TypedTestTrue>,
-                                  std::pair<TypedTestFalse, TypedTestFalse>>;
+using test_types = testing::Types<TypedTestTrue, TypedTestFalse>;
 TYPED_TEST_SUITE(DynamicHistogramTypedTest, test_types);
 
 TYPED_TEST(DynamicHistogramTypedTest, referenceEquivalence) {
@@ -242,16 +235,13 @@ TYPED_TEST(DynamicHistogramTypedTest, referenceEquivalence) {
   static constexpr int kMaxNumBuckets = 31;
   static constexpr int kNumValues = 100000;
 
-  typename TypeParam::first_type param1;
-  typename TypeParam::second_type param2;
+  TypeParam kThreadsafe;
 
   DynamicHistogramReference ref(/*decay_rate=*/kDecayRate,
                                 /*max_num_buckets=*/kMaxNumBuckets);
-  DynamicHistogram</*useDecay=*/true,
-                   /*useInsertQueue=*/param1.val,
-                   /*threadsafe=*/param2.val>
-      dyn(/*decay_rate=*/kDecayRate,
-          /*max_num_buckets=*/kMaxNumBuckets);
+  DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/kThreadsafe.val> dyn(
+      /*decay_rate=*/kDecayRate,
+      /*max_num_buckets=*/kMaxNumBuckets);
 
   std::default_random_engine gen;
   gen.seed(1);

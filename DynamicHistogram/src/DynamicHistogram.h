@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <mutex>
 #include <vector>
 
 namespace dhist {
@@ -34,24 +35,24 @@ private:
 };
 
 
-template <bool useDecay=true, bool useInsertQueue=true, bool threadsafe=true>
+template <bool kUseDecay=true, bool kThreadsafe=true>
 class DynamicHistogram {
 public:
   DynamicHistogram(double decay_rate, size_t max_num_buckets,
-                   int queue_size = 256)
+                   int refresh_interval = 256)
       : decay_rate_(decay_rate), max_num_buckets_(max_num_buckets),
-        queue_size_(256), generation_(0), refresh_generation_(0),
+        refresh_interval_(256), generation_(0), refresh_generation_(0),
         total_count_(0.0), insert_queue_begin_(0), insert_queue_end_(0) {
-    assert(useDecay == (decay_rate != 0.0));
+    assert(kUseDecay == (decay_rate != 0.0));
     ubounds_.resize(max_num_buckets_ - 1);
     counts_.resize(max_num_buckets_);
     bucket_generation_.resize(max_num_buckets_);
-    insert_queue_.resize(queue_size_);
+    insert_queue_.resize(refresh_interval_);
 
-    if (useDecay) {
-      decay_factors_.resize(queue_size_);
+    if (kUseDecay) {
+      decay_factors_.resize(refresh_interval_);
       double decay = 1.0;
-      for (int i = 0; i < queue_size_; i++) {
+      for (int i = 0; i < refresh_interval_; i++) {
         decay_factors_[i] = decay;
         decay *= 1.0 - decay_rate_;
       }
@@ -60,24 +61,7 @@ public:
 
   virtual ~DynamicHistogram() {}
 
-  void addValue(double val) {
-    if (useInsertQueue) {
-      insert_queue_[insert_queue_end_] = val;
-      insert_queue_end_++;
-      if (insert_queue_end_ == insert_queue_.size()) {
-        insert_queue_end_ = 0;
-      }
-
-      if (insert_queue_count() + 1 == insert_queue_.size()) {
-        flush();
-      }
-    } else {
-      addValueLocked(val);
-      if (generation_ - refresh_generation_ + 1 == queue_size_) {
-        refresh();
-      }
-    }
-  }
+  void addValue(double val) { addValueImpl<kThreadsafe>(val); }
 
   void addRepeatedValue(double val, uint64_t nValues) {
     for (int i = 0; i < nValues; i++) {
@@ -85,8 +69,8 @@ public:
     }
   }
 
-  void clear() {
-  }
+  // TODO(lpe)
+  void clear() { assert(false); }
 
   // TODO(lpe)
   void merge(const DynamicHistogram &other) { assert(false); }
@@ -140,13 +124,13 @@ public:
   }
 
   double computeTotalCount() {
-    flush();
+    flush<kThreadsafe>(insert_queue_count<kThreadsafe>());
     return total_count_;
   }
 
   // quantile is in [0, 1]
   double getQuantileEstimate(double quantile) {
-    flush();
+    flush<kThreadsafe>(insert_queue_count<kThreadsafe>());
 
     if (total_count_ == 0.0) {
       return 0.0;
@@ -191,7 +175,7 @@ public:
   }
 
   std::string debugString() {
-    refresh();
+    flush<kThreadsafe>(insert_queue_count<kThreadsafe>());
     std::string s;
     s.resize(50 * (counts_.size() + 1));
     int cursor = 0;
@@ -216,7 +200,7 @@ public:
   }
 
   std::string json() {
-    refresh();
+    flush<kThreadsafe>(insert_queue_count<kThreadsafe>());
     std::string s;
     s.resize((counts_.size() + ubounds_.size() + 2) * 16);
     int cursor = 0;
@@ -240,13 +224,16 @@ public:
 protected:
   const double decay_rate_;
   const size_t max_num_buckets_;
-  const int queue_size_;
+  const int refresh_interval_;
 
   uint64_t generation_;
   uint64_t refresh_generation_;
   double total_count_;
   int insert_queue_begin_;
   int insert_queue_end_;
+
+  std::mutex insert_mu_;
+  std::mutex flush_mu_;
 
   // ubounds_ records the upper bound of a bucket. There isn't an upper bound
   // for the last bucket, so the length of counts_ will generally be one greater
@@ -259,7 +246,11 @@ protected:
   std::vector<double> quantile_locations_;
   std::vector<double> decay_factors_;
 
-  int insert_queue_count() const {
+  template <bool threadsafe>
+  int insert_queue_count() const;
+
+  template <>
+  int insert_queue_count</*threadsafe=*/true>() const {
     int size = insert_queue_end_ - insert_queue_begin_;
     if (size < 0) {
       size += insert_queue_.size();
@@ -267,12 +258,23 @@ protected:
     return size;
   }
 
-  void flush() {
+  template <>
+  int insert_queue_count</*threadsafe=*/false>() const {
+    return 0;
+  }
+
+  template <bool threadsafe>
+  void flush(int items);
+
+  template <>
+  void flush</*threadsafe=*/true>(int items) {
+    std::scoped_lock{flush_mu_};
+
     const int qx_end = insert_queue_end_;
     const int size = insert_queue_.size();
     int qx = insert_queue_begin_;
-    while (qx != qx_end) {
-      addValueLocked(insert_queue_[qx]);
+    for (int i = 0; i < items; i++) {
+      addValueImpl(insert_queue_[qx]);
       qx++;
       if (qx == size) {
         qx = 0;
@@ -282,7 +284,12 @@ protected:
     refresh();
   }
 
-  void addValueLocked(double val) {
+  template <>
+  void flush</*threadsafe=*/false>(int items) {
+    refresh();
+  }
+
+  void addValueImpl(double val) {
     generation_++;
 
     //decay();
@@ -292,7 +299,7 @@ protected:
     //shift_quantiles(val);
     int bx = insertValue(val);
 
-    if (useDecay) {
+    if (kUseDecay) {
       total_count_ = total_count_ * (1.0 - decay_rate_) + 1.0;
     } else {
       total_count_ = generation_;
@@ -307,12 +314,45 @@ protected:
     merge();
   }
 
+  template <bool threadsafe>
+  void addValueImpl(double val);
+
+  template <>
+  void addValueImpl</*threadsafe=*/true>(double val) {
+    int items = 0;
+    {
+      std::scoped_lock{insert_mu_};
+      insert_queue_[insert_queue_end_] = val;
+      insert_queue_end_++;
+      if (insert_queue_end_ == insert_queue_.size()) {
+        insert_queue_end_ = 0;
+      }
+
+      int count = insert_queue_count<kThreadsafe>();
+      if (count + 1 == insert_queue_.size()) {
+        items = count;
+      }
+    }
+
+    if (items) {
+      flush</*kThreadsafe=*/true>(items);
+    }
+  }
+
+  template <>
+  void addValueImpl</*threadsafe=*/false>(double val) {
+    addValueImpl(val);
+    if (generation_ - refresh_generation_ + 1 == refresh_interval_) {
+      refresh();
+    }
+  }
+
   double splitThreshold() {
     return 2 * total_count_ / getNumBuckets();
   }
 
   double countAfterDecay(double original, uint64_t generations) {
-    if (!useDecay) {
+    if (!kUseDecay) {
       return original;
     }
     // This invariant should be maintained by addValue calling refresh()
@@ -322,7 +362,7 @@ protected:
   }
 
   void decay(int bx) {
-    if (!useDecay) {
+    if (!kUseDecay) {
       return;
     }
     counts_[bx] =
