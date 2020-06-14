@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "gmock/gmock.h"
@@ -216,6 +217,42 @@ TEST(DynamicHistogramTest, addWithDecay) {
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
 }
 
+TEST(DynamicHistogramTest, multithreadedStress) {
+  static const int kInsertsPerThread = 100000;
+  static const int kNumThreads = 8;
+  std::thread threads[kNumThreads];
+
+  DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/true> uut(
+      /*decay_rate=*/0.00001, /*max_num_buckets=*/31);
+
+  for (int tx = 0; tx < kNumThreads; tx++) {
+    threads[tx] = std::thread(
+        [&](int tx) {
+          std::default_random_engine gen;
+          gen.seed(tx);
+          std::normal_distribution<double> norm(0.0, 1.0);
+          std::bernoulli_distribution bern(0.01);
+
+          for (int i = 0; i < kInsertsPerThread; i++) {
+            uut.addValue(norm(gen));
+
+            if (bern(gen)) {
+              EXPECT_GT(uut.json().size(), 0);
+            }
+
+            if (i > 100000 && bern(gen)) {
+              EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0, 1.0);
+            }
+          }
+        },
+        tx);
+  }
+
+  for (int tx = 0; tx < kNumThreads; tx++) {
+    threads[tx].join();
+  }
+}
+
 struct TypedTestTrue {
   static constexpr bool val = true;
 };
@@ -233,7 +270,7 @@ TYPED_TEST_SUITE(DynamicHistogramTypedTest, test_types);
 TYPED_TEST(DynamicHistogramTypedTest, referenceEquivalence) {
   static constexpr double kDecayRate = 0.0001;
   static constexpr int kMaxNumBuckets = 31;
-  static constexpr int kNumValues = 100000;
+  static constexpr int kNumValues = 1;
 
   TypeParam kThreadsafe;
 
@@ -254,8 +291,9 @@ TYPED_TEST(DynamicHistogramTypedTest, referenceEquivalence) {
 
   EXPECT_NEAR(ref.computeTotalCount(), dyn.computeTotalCount(), 1e-6);
   for (int i = 1; i < 100; i++) {
-    EXPECT_NEAR(ref.getQuantileEstimate(i / 100.0),
-                dyn.getQuantileEstimate(i / 100.0), 1e-6);
+    ASSERT_NEAR(ref.getQuantileEstimate(i / 100.0),
+                dyn.getQuantileEstimate(i / 100.0), 1e-6)
+        << "(tested percentile: " << i / 100.0 << ")";
   }
 
   EXPECT_EQ(ref.getNumBuckets(), dyn.getNumBuckets());

@@ -89,10 +89,10 @@ public:
     int bucket_idx = 0;
     for (; bucket_idx < ubounds_.size(); bucket_idx++) {
       if (val < ubounds_[bucket_idx]) {
-        break;
+        return bucket_idx;
       }
     }
-    return bucket_idx;
+    return ubounds_.size();
   }
 
   double getMin() const {

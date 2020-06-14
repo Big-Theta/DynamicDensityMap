@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <map>
 #include <mutex>
 #include <vector>
@@ -34,17 +35,18 @@ private:
   double count_;
 };
 
-
 template <bool kUseDecay=true, bool kThreadsafe=true>
 class DynamicHistogram {
 public:
   DynamicHistogram(double decay_rate, size_t max_num_buckets,
-                   int refresh_interval = 256)
+                   int refresh_interval = 512)
       : decay_rate_(decay_rate), max_num_buckets_(max_num_buckets),
-        refresh_interval_(256), generation_(0), refresh_generation_(0),
-        total_count_(0.0), insert_queue_begin_(0), insert_queue_end_(0) {
+        refresh_interval_(refresh_interval), generation_(0),
+        refresh_generation_(0), total_count_(0.0), insert_queue_begin_(0),
+        insert_queue_end_(0), insert_queue_to_flush_(0) {
     assert(kUseDecay == (decay_rate != 0.0));
-    ubounds_.resize(max_num_buckets_ - 1);
+    ubounds_.resize(max_num_buckets_);
+    ubounds_.back() = std::numeric_limits<double>::max();
     counts_.resize(max_num_buckets_);
     bucket_generation_.resize(max_num_buckets_);
     insert_queue_.resize(refresh_interval_);
@@ -61,7 +63,9 @@ public:
 
   virtual ~DynamicHistogram() {}
 
-  void addValue(double val) { addValueImpl<kThreadsafe>(val); }
+  void addValue(double val) {
+    addValueImpl<kThreadsafe>(val);
+  }
 
   void addRepeatedValue(double val, uint64_t nValues) {
     for (int i = 0; i < nValues; i++) {
@@ -89,7 +93,7 @@ public:
     }
 
     double max;
-    if (bx < ubounds_.size()) {
+    if (bx + 1 < ubounds_.size()) {
       max = ubounds_[bx];
     } else {
       max = getMax();
@@ -114,23 +118,35 @@ public:
   }
 
   double getMax() const {
-    const int bx = ubounds_.size() - 1;
+    const int bx = ubounds_.size() - 2;
     assert(bucket_generation_[bx] == bucket_generation_[bx - 1]);
     if (counts_[bx] == 0.0) {
-      return ubounds_.back();
+      // The last ubounds_ value is a fake value that allows std::upper_bound
+      // to work.
+      return ubounds_[ubounds_.size() - 2];
     }
-    return ubounds_[bx] + (counts_[bx + 1] / counts_[bx]) *
-                               (ubounds_[bx] - ubounds_[bx - 1]);
+    return ubounds_[bx] +
+           (counts_[bx + 1] / counts_[bx]) * (ubounds_[bx] - ubounds_[bx - 1]);
   }
 
   double computeTotalCount() {
-    flush<kThreadsafe>(insert_queue_count<kThreadsafe>());
+    int to_flush = reserve_flush_items();
+    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
+    if (kThreadsafe) {
+      lp.reset(new std::scoped_lock(flush_mu_));
+    }
+    flush<kThreadsafe>(to_flush);
     return total_count_;
   }
 
   // quantile is in [0, 1]
   double getQuantileEstimate(double quantile) {
-    flush<kThreadsafe>(insert_queue_count<kThreadsafe>());
+    int to_flush = reserve_flush_items();
+    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
+    if (kThreadsafe) {
+      lp.reset(new std::scoped_lock(flush_mu_));
+    }
+    flush<kThreadsafe>(to_flush);
 
     if (total_count_ == 0.0) {
       return 0.0;
@@ -158,7 +174,7 @@ public:
     }
 
     double upper_bound;
-    if (bx < ubounds_.size()) {
+    if (bx + 1 < ubounds_.size()) {
       upper_bound = ubounds_[bx];
     } else {
       upper_bound = getMax();
@@ -175,7 +191,13 @@ public:
   }
 
   std::string debugString() {
-    flush<kThreadsafe>(insert_queue_count<kThreadsafe>());
+    int to_flush = reserve_flush_items();
+    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
+    if (kThreadsafe) {
+      lp.reset(new std::scoped_lock(flush_mu_));
+    }
+    flush<kThreadsafe>(to_flush);
+
     std::string s;
     s.resize(50 * (counts_.size() + 1));
     int cursor = 0;
@@ -195,19 +217,24 @@ public:
     cursor += snprintf(&s[cursor], s.size() - cursor, "  %d [%lf, %lf): %lf\n",
                        i + 1, ubounds_.back(), getMax(), counts_[i + 1]);
     s.resize(cursor);
-
     return s;
   }
 
   std::string json() {
-    flush<kThreadsafe>(insert_queue_count<kThreadsafe>());
+    int to_flush = reserve_flush_items();
+    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
+    if (kThreadsafe) {
+      lp.reset(new std::scoped_lock(flush_mu_));
+    }
+    flush<kThreadsafe>(to_flush);
+
     std::string s;
     s.resize((counts_.size() + ubounds_.size() + 2) * 16);
     int cursor = 0;
     cursor += snprintf(&s[cursor], s.size() - cursor, "{\n  \"bounds\": [%lf, ",
                        getMin());
-    for (auto bound : ubounds_) {
-      cursor += snprintf(&s[cursor], s.size() - cursor, "%lf, ", bound);
+    for (int i = 0; i + 1 < ubounds_.size(); i++) {
+      cursor += snprintf(&s[cursor], s.size() - cursor, "%lf, ", ubounds_[i]);
     }
     cursor += snprintf(&s[cursor], s.size() - cursor, "%lf],\n  \"counts\": [",
                        getMax());
@@ -231,6 +258,7 @@ protected:
   double total_count_;
   int insert_queue_begin_;
   int insert_queue_end_;
+  int insert_queue_to_flush_;
 
   std::mutex insert_mu_;
   std::mutex flush_mu_;
@@ -268,13 +296,11 @@ protected:
 
   template <>
   void flush</*threadsafe=*/true>(int items) {
-    std::scoped_lock{flush_mu_};
-
-    const int qx_end = insert_queue_end_;
     const int size = insert_queue_.size();
     int qx = insert_queue_begin_;
     for (int i = 0; i < items; i++) {
-      addValueImpl(insert_queue_[qx]);
+      // Use the unlocked version of addValueImpl now that we're under a lock.
+      addValueImpl</*threadsafe=*/false>(insert_queue_[qx]);
       qx++;
       if (qx == size) {
         qx = 0;
@@ -289,7 +315,36 @@ protected:
     refresh();
   }
 
-  void addValueImpl(double val) {
+  template <bool threadsafe>
+  void addValueImpl(double val);
+
+  template <> void addValueImpl</*threadsafe=*/true>(double val) {
+    std::scoped_lock insert_lock(insert_mu_);
+
+    while (kThreadsafe &&
+           (2 * insert_queue_to_flush_ >= insert_queue_.size())) {
+      int items = insert_queue_to_flush_;
+      insert_queue_to_flush_ = 0;
+
+      insert_mu_.unlock();
+      {
+        std::scoped_lock flush_lock(flush_mu_);
+        flush</*kThreadsafe=*/true>(items);
+      }
+      insert_mu_.lock();
+    }
+
+    insert_queue_[insert_queue_end_] = val;
+    insert_queue_end_++;
+    insert_queue_to_flush_++;
+
+    if (insert_queue_end_ == insert_queue_.size()) {
+      insert_queue_end_ = 0;
+    }
+  }
+
+  template <>
+  void addValueImpl</*threadsafe=*/false>(double val) {
     generation_++;
 
     //decay();
@@ -305,46 +360,31 @@ protected:
       total_count_ = generation_;
     }
 
+    if (generation_ - refresh_generation_ + 1 == refresh_interval_) {
+      refresh();
+    }
+
     if (counts_[bx] < splitThreshold()) {
       return;
     }
 
     refresh();
+    if (kUseDecay) {
+      for (int i = 0; i < bucket_generation_.size(); i++) {
+        assert(bucket_generation_[i] == generation_);
+      }
+    }
+
     split(bx);
     merge();
   }
 
-  template <bool threadsafe>
-  void addValueImpl(double val);
-
-  template <>
-  void addValueImpl</*threadsafe=*/true>(double val) {
-    int items = 0;
-    {
-      std::scoped_lock{insert_mu_};
-      insert_queue_[insert_queue_end_] = val;
-      insert_queue_end_++;
-      if (insert_queue_end_ == insert_queue_.size()) {
-        insert_queue_end_ = 0;
-      }
-
-      int count = insert_queue_count<kThreadsafe>();
-      if (count + 1 == insert_queue_.size()) {
-        items = count;
-      }
-    }
-
-    if (items) {
-      flush</*kThreadsafe=*/true>(items);
-    }
-  }
-
-  template <>
-  void addValueImpl</*threadsafe=*/false>(double val) {
-    addValueImpl(val);
-    if (generation_ - refresh_generation_ + 1 == refresh_interval_) {
-      refresh();
-    }
+  int reserve_flush_items() {
+    // TODO: Could this just use an atomic for insert_queue_to_flush_?
+    std::scoped_lock l(insert_mu_);
+    int to_flush = insert_queue_to_flush_;
+    insert_queue_to_flush_ = 0;
+    return to_flush;
   }
 
   double splitThreshold() {
@@ -401,7 +441,7 @@ protected:
                          (count_with_below + 1.0);
     }
 
-    if (bx < ubounds_.size()) {
+    if (bx + 1 < counts_.size()) {
       decay(bx + 1);
       double count_with_above = count_bx + counts_[bx + 1];
       ubounds_[bx] =
@@ -421,9 +461,10 @@ protected:
       lower_bound = ubounds_[bx - 1];
     }
 
-    if (bx == ubounds_.size()) {
+    if (bx + 1 == ubounds_.size()) {
       double upper_bound = getMax();
-      ubounds_.push_back((lower_bound + upper_bound) / 2.0);
+      ubounds_.back() = (lower_bound + upper_bound) / 2.0;
+      ubounds_.push_back(std::numeric_limits<double>::max());
       counts_[bx] /= 2.0;
       counts_.push_back(counts_.back());
     } else {
@@ -485,11 +526,6 @@ protected:
                                                   bucket.diameter() /
                                                   bucket.count();
         }
-
-        //printf("idx: %d, quantile: %lf, location: %lf, target_location: %lf, "
-        //       "bucket.min(): %lf, bucket.max(): %lf\n",
-        //       idx, quantiles_[idx], location, target_location, bucket.min(),
-        //       bucket.max());
 
         if (in_range(val, bucket.min(), bucket.max()) &&
             in_range(val, location, target_location)) {
