@@ -378,11 +378,6 @@ protected:
                                                   bucket.count();
         }
 
-        //printf("idx: %d, quantile: %lf, location: %lf, target_location: %lf, "
-        //       "bucket.min(): %lf, bucket.max(): %lf\n",
-        //       idx, quantiles_[idx], location, target_location, bucket.min(),
-        //       bucket.max());
-
         if (in_range(val, bucket.min(), bucket.max()) &&
             in_range(val, location, target_location)) {
           // The inserted value is in between the current location and the
@@ -424,4 +419,4 @@ protected:
   }
 };
 
-}  // namespace dhist
+} // namespace dhist

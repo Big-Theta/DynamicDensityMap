@@ -6,8 +6,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -35,7 +35,7 @@ private:
   double count_;
 };
 
-template <bool kUseDecay=true, bool kThreadsafe=true>
+template <bool kUseDecay = true, bool kThreadsafe = true>
 class DynamicHistogram {
 public:
   DynamicHistogram(double decay_rate, size_t max_num_buckets,
@@ -63,9 +63,7 @@ public:
 
   virtual ~DynamicHistogram() {}
 
-  void addValue(double val) {
-    addValueImpl<kThreadsafe>(val);
-  }
+  void addValue(double val) { addValueImpl<kThreadsafe>(val); }
 
   void addRepeatedValue(double val, uint64_t nValues) {
     for (int i = 0; i < nValues; i++) {
@@ -104,9 +102,7 @@ public:
     return Bucket(/*min=*/min, /*max=*/max, /*count=*/counts_[bx]);
   }
 
-  int getBucketIndexByValue(double val) const {
-    return -1;
-  }
+  int getBucketIndexByValue(double val) const { return -1; }
 
   double getMin() const {
     assert(bucket_generation_[0] == bucket_generation_[1]);
@@ -183,8 +179,7 @@ public:
     return frac * (upper_bound - lower_bound) + lower_bound;
   }
 
-  void trackQuantiles(const std::vector<double> &quantiles) {
-  }
+  void trackQuantiles(const std::vector<double> &quantiles) {}
 
   std::map<double, double> getTrackedQuantiles() const {
     return std::map<double, double>();
@@ -274,11 +269,9 @@ protected:
   std::vector<double> quantile_locations_;
   std::vector<double> decay_factors_;
 
-  template <bool threadsafe>
-  int insert_queue_count() const;
+  template <bool threadsafe> int insert_queue_count() const;
 
-  template <>
-  int insert_queue_count</*threadsafe=*/true>() const {
+  template <> int insert_queue_count</*threadsafe=*/true>() const {
     int size = insert_queue_end_ - insert_queue_begin_;
     if (size < 0) {
       size += insert_queue_.size();
@@ -286,16 +279,11 @@ protected:
     return size;
   }
 
-  template <>
-  int insert_queue_count</*threadsafe=*/false>() const {
-    return 0;
-  }
+  template <> int insert_queue_count</*threadsafe=*/false>() const { return 0; }
 
-  template <bool threadsafe>
-  void flush(int items);
+  template <bool threadsafe> void flush(int items);
 
-  template <>
-  void flush</*threadsafe=*/true>(int items) {
+  template <> void flush</*threadsafe=*/true>(int items) {
     const int size = insert_queue_.size();
     int qx = insert_queue_begin_;
     for (int i = 0; i < items; i++) {
@@ -310,13 +298,9 @@ protected:
     refresh();
   }
 
-  template <>
-  void flush</*threadsafe=*/false>(int items) {
-    refresh();
-  }
+  template <> void flush</*threadsafe=*/false>(int items) { refresh(); }
 
-  template <bool threadsafe>
-  void addValueImpl(double val);
+  template <bool threadsafe> void addValueImpl(double val);
 
   template <> void addValueImpl</*threadsafe=*/true>(double val) {
     std::scoped_lock insert_lock(insert_mu_);
@@ -343,15 +327,14 @@ protected:
     }
   }
 
-  template <>
-  void addValueImpl</*threadsafe=*/false>(double val) {
+  template <> void addValueImpl</*threadsafe=*/false>(double val) {
     generation_++;
 
-    //decay();
+    // decay();
     // shift_quantiles will treat the new value as a point with mass 1 which
     // only makes sense after the decay and before the point has been
     // integrated into the histogram.
-    //shift_quantiles(val);
+    // shift_quantiles(val);
     int bx = insertValue(val);
 
     if (kUseDecay) {
@@ -387,9 +370,7 @@ protected:
     return to_flush;
   }
 
-  double splitThreshold() {
-    return 2 * total_count_ / getNumBuckets();
-  }
+  double splitThreshold() { return 2 * total_count_ / getNumBuckets(); }
 
   double countAfterDecay(double original, uint64_t generations) {
     if (!kUseDecay) {
@@ -536,8 +517,7 @@ protected:
           break;
         }
 
-        if (bx > 0 &&
-            in_range(bucket.min(), location, target_location)) {
+        if (bx > 0 && in_range(bucket.min(), location, target_location)) {
           // Shift to the lower bucket.
           shift_remaining = shift_remaining * (location - bucket.min()) /
                             (location - target_location);
@@ -568,6 +548,6 @@ protected:
   }
 };
 
-}
+} // namespace dhist
 
-#endif  // DYNAMIC_HISTOGRAM_H
+#endif // DYNAMIC_HISTOGRAM_H

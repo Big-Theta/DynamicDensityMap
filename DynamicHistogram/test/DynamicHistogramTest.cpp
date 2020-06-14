@@ -261,8 +261,7 @@ struct TypedTestFalse {
   static constexpr bool val = false;
 };
 
-template <typename T>
-class DynamicHistogramTypedTest : public testing::Test {};
+template <typename T> class DynamicHistogramTypedTest : public testing::Test {};
 
 using test_types = testing::Types<TypedTestTrue, TypedTestFalse>;
 TYPED_TEST_SUITE(DynamicHistogramTypedTest, test_types);

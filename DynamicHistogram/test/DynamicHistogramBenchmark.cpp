@@ -88,8 +88,9 @@ template <class T> void BM_AddNoDecay(benchmark::State &state) {
     uut.addValue(vals[i]);
   }
 }
-BENCHMARK_TEMPLATE(BM_AddNoDecay, dhist::DynamicHistogram</*kUseDecay=*/false,
-                                                          /*kThreadsafe=*/true>);
+BENCHMARK_TEMPLATE(BM_AddNoDecay,
+                   dhist::DynamicHistogram</*kUseDecay=*/false,
+                                           /*kThreadsafe=*/true>);
 BENCHMARK_TEMPLATE(BM_AddNoDecay,
                    dhist::DynamicHistogram</*kUseDecay=*/false,
                                            /*kThreadsafe=*/false>);
