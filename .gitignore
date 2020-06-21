@@ -45,7 +45,7 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 
-debug/*
-Debug/*
-release/*
-Release/*
+cpp/debug/*
+cpp/Debug/*
+cpp/release/*
+cpp/Release/*
