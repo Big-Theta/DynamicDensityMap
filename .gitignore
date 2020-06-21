@@ -46,4 +46,6 @@ CTestTestfile.cmake
 _deps
 
 debug/*
+Debug/*
 release/*
+Release/*
