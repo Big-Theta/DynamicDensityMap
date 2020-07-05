@@ -49,3 +49,8 @@ cpp/debug/*
 cpp/Debug/*
 cpp/release/*
 cpp/Release/*
+
+# Rust
+debug/
+target/
+**/*.rs.bk
