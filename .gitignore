@@ -54,3 +54,6 @@ cpp/Release/*
 debug/
 target/
 **/*.rs.bk
+
+# Bazel
+bazel-*

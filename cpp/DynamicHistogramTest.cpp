@@ -54,8 +54,6 @@ double exponential_sum(double a, double r, int n) {
 TEST(ReferenceTest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
-  static constexpr double kMean = 0.0;
-  static constexpr double kStdDev = 1.0;
   DynamicHistogramReference uut(/*decay_rate=*/kDecayRate,
                                 /*max_num_buckets=*/31);
   std::default_random_engine gen;
@@ -74,8 +72,6 @@ TEST(ReferenceTest, addNoDecay) {
 TEST(ReferenceTest, addWithDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.00001;
-  static constexpr double kMean = 0.0;
-  static constexpr double kStdDev = 1.0;
   DynamicHistogramReference uut(/*decay_rate=*/kDecayRate,
                                 /*max_num_buckets=*/31);
   std::default_random_engine gen;
@@ -118,7 +114,6 @@ TEST(ReferenceTest, addRandomNoDecay) {
 }
 
 TEST(ReferenceTest, trackQuantiles) {
-  static constexpr int kNumValues = 1000000;
   DynamicHistogramReference uut(
       /*decay_rate=*/0.0, /*max_num_buckets=*/4,
       /*ubounds=*/std::vector<double>({0.25, 0.5, 0.75}),
@@ -166,8 +161,6 @@ TEST(ReferenceTest, quantilesTracking) {
 TEST(DynamicHistogramTest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
-  static constexpr double kMean = 0.0;
-  static constexpr double kStdDev = 1.0;
   DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/false> uut(
       /*decay_rate=*/kDecayRate,
       /*max_num_buckets=*/31);
@@ -189,8 +182,6 @@ TEST(DynamicHistogramTest, addNoDecay) {
 TEST(DynamicHistogramTest, addWithDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.00001;
-  static constexpr double kMean = 0.0;
-  static constexpr double kStdDev = 1.0;
   DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/false> uut(
       /*decay_rate=*/kDecayRate,
       /*max_num_buckets=*/31);

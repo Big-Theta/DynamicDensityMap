@@ -1,0 +1,29 @@
+cc_library(
+    name = "dynamic_histogram",
+    hdrs = ["cpp/DynamicHistogram.h"],
+    copts = [
+        "-std=c++17",
+    ],
+)
+
+cc_library(
+    name = "dynamic_histogram_reference",
+    hdrs = ["cpp/DynamicHistogramReference.h"],
+    copts = [
+        "-std=c++17",
+    ],
+)
+
+cc_test(
+    name = "dynamic_histogram_test",
+    srcs = ["cpp/DynamicHistogramTest.cpp"],
+    deps = [
+        ":dynamic_histogram",
+        ":dynamic_histogram_reference",
+        "@gtest//:gtest",
+        "@gtest//:gtest_main"
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+)

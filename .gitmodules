@@ -1,6 +1,0 @@
-[submodule "DynamicHistogram/lib/googletest"]
-	path = cpp/lib/googletest
-	url = git@github.com:google/googletest.git
-[submodule "DynamicHistogram/lib/benchmark"]
-	path = cpp/lib/benchmark
-	url = https://github.com/google/benchmark.git
