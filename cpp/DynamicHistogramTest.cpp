@@ -8,8 +8,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#include "DynamicHistogram.h"
-#include "DynamicHistogramReference.h"
+#include "cpp/DynamicHistogram.h"
+#include "cpp/DynamicHistogramReference.h"
 
 using dhist::DynamicHistogram;
 using dhist::DynamicHistogramReference;
