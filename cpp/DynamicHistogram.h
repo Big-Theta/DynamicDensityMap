@@ -196,24 +196,20 @@ public:
     flush<kThreadsafe>(to_flush);
 
     std::string s;
-    s.resize(50 * (counts_.size() + 1));
-    int cursor = 0;
-
-    cursor += snprintf(&s[cursor], s.size() - cursor,
-                       "generation: %lu\ntotal_count: %lf\n", generation_,
-                       computeTotalCount());
-
-    cursor += snprintf(&s[cursor], s.size() - cursor, "  %d [%lf, %lf): %lf\n",
-                       0, getMin(), ubounds_[1], counts_[0]);
-    int i;
-    for (i = 0; i < ubounds_.size() - 1; i++) {
-      cursor +=
-          snprintf(&s[cursor], s.size() - cursor, "  %d [%lf, %lf): %lf\n",
-                   i + 1, ubounds_[i], ubounds_[i + 1], counts_[i + 1]);
+    s += "generation: " + std::to_string(total_count_) + "\n"
+         "total_count: " + std::to_string(computeTotalCount()) + "\n";
+    s += "  " + std::to_string(0) + " [" + std::to_string(getMin()) + ", " +
+         std::to_string(ubounds_[0]) + "): " + std::to_string(counts_[0]) +
+         "\n";
+    int i = 1;
+    for (; i < ubounds_.size() - 1; i++) {
+      s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
+           ", " + std::to_string(ubounds_[i]) +
+           "): " + std::to_string(counts_[i]) + "\n";
     }
-    cursor += snprintf(&s[cursor], s.size() - cursor, "  %d [%lf, %lf): %lf\n",
-                       i + 1, ubounds_.back(), getMax(), counts_[i + 1]);
-    s.resize(cursor);
+    s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
+         ", " + std::to_string(getMax()) +
+         "): " + std::to_string(counts_[i]) + "\n";
     return s;
   }
 
@@ -226,22 +222,17 @@ public:
     flush<kThreadsafe>(to_flush);
 
     std::string s;
-    s.resize((counts_.size() + ubounds_.size() + 2) * 16);
-    int cursor = 0;
-    cursor += snprintf(&s[cursor], s.size() - cursor, "{\n  \"bounds\": [%lf, ",
-                       getMin());
+    s += "{\n  \"bounds\": [" + std::to_string(getMin()) + ", ";
     for (int i = 0; i + 1 < ubounds_.size(); i++) {
-      cursor += snprintf(&s[cursor], s.size() - cursor, "%lf, ", ubounds_[i]);
+      s += std::to_string(ubounds_[i]) + ", ";
     }
-    cursor += snprintf(&s[cursor], s.size() - cursor, "%lf],\n  \"counts\": [",
-                       getMax());
+    s += std::to_string(getMax()) + "],\n  \"counts\": [";
 
-    for (int i = 0; i < counts_.size() - 1; i++) {
-      cursor += snprintf(&s[cursor], s.size() - cursor, "%lf, ", counts_[i]);
+    int i = 0;
+    for (; i < counts_.size() - 1; i++) {
+      s += std::to_string(counts_[i]) + ", ";
     }
-    cursor +=
-        snprintf(&s[cursor], s.size() - cursor, "%lf]\n}\n", counts_.back());
-    s.resize(cursor);
+    s += std::to_string(counts_[i]) + "]\n}\n";
     return s;
   }
 
