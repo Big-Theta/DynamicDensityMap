@@ -2,6 +2,7 @@
 
 #include <random>
 
+#include "DynamicHistogram.h"
 #include "DynamicHistogramReference.h"
 #include "benchmark/benchmark.h"
 
@@ -17,8 +18,9 @@ static void BM_ReferenceAdd(benchmark::State &state) {
   double decay_rates[2] = {0.0, 0.0001};
   double decay_rate = decay_rates[state.range(0)];
 
-  dhist::DynamicHistogramReference uut(/*decay_rate=*/decay_rate,
-                                       /*max_num_buckets=*/31);
+  dhist::DynamicHistogramReference uut(
+      /*max_num_buckets=*/31,
+      /*decay_rate=*/decay_rate);
 
   int i = 0;
   int size = vals.size();
@@ -44,8 +46,7 @@ template <class T> void BM_AddDecay(benchmark::State &state) {
 
   double decay_rate = 0.0001;
 
-  T uut(/*decay_rate=*/decay_rate,
-        /*max_num_buckets=*/31);
+  T uut(/*max_num_buckets=*/31, /*decay_rate=*/decay_rate);
 
   int i = 0;
   int size = vals.size();
@@ -74,8 +75,7 @@ template <class T> void BM_AddNoDecay(benchmark::State &state) {
 
   double decay_rate = 0.0;
 
-  T uut(/*decay_rate=*/decay_rate,
-        /*max_num_buckets=*/31);
+  T uut(/*max_num_buckets=*/31, /*decay_rate=*/decay_rate);
 
   int i = 0;
   int size = vals.size();

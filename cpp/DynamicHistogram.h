@@ -40,9 +40,9 @@ private:
 template <bool kUseDecay = true, bool kThreadsafe = true>
 class DynamicHistogram {
 public:
-  DynamicHistogram(double decay_rate, size_t max_num_buckets,
+  DynamicHistogram(size_t max_num_buckets, double decay_rate = 0.0,
                    int refresh_interval = 512)
-      : decay_rate_(decay_rate), max_num_buckets_(max_num_buckets),
+      : max_num_buckets_(max_num_buckets), decay_rate_(decay_rate),
         refresh_interval_(refresh_interval), generation_(0),
         refresh_generation_(0), total_count_(0.0), insert_queue_begin_(0),
         insert_queue_end_(0), insert_queue_to_flush_(0) {
@@ -246,8 +246,8 @@ public:
   }
 
 protected:
-  const double decay_rate_;
   const size_t max_num_buckets_;
+  const double decay_rate_;
   const int refresh_interval_;
 
   uint64_t generation_;

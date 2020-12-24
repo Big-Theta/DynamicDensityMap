@@ -29,3 +29,16 @@ cc_test(
         "-std=c++17",
     ],
 )
+
+cc_binary(
+    name = "dynamic_histogram_benchmark",
+    srcs = ["cpp/DynamicHistogramBenchmark.cpp"],
+    deps = [
+        ":dynamic_histogram",
+        ":dynamic_histogram_reference",
+        "@benchmark//:benchmark",
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+)

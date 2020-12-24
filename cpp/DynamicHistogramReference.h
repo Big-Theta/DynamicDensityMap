@@ -4,17 +4,17 @@ namespace dhist {
 
 class DynamicHistogramReference {
 public:
-  DynamicHistogramReference(double decay_rate, size_t max_num_buckets)
-      : decay_rate_(decay_rate), max_num_buckets_(max_num_buckets),
+  DynamicHistogramReference(size_t max_num_buckets, double decay_rate = 0.0)
+      : max_num_buckets_(max_num_buckets), decay_rate_(decay_rate),
         generation_(0) {
     ubounds_.resize(max_num_buckets_ - 1);
     counts_.resize(max_num_buckets_);
   }
 
-  DynamicHistogramReference(double decay_rate, size_t max_num_buckets,
+  DynamicHistogramReference(size_t max_num_buckets, double decay_rate,
                             const std::vector<double> &ubounds,
                             const std::vector<double> &counts)
-      : DynamicHistogramReference(decay_rate, max_num_buckets) {
+      : DynamicHistogramReference(max_num_buckets, decay_rate) {
     assert(ubounds.size() + 1 == counts.size());
 
     ubounds_.clear();
@@ -257,8 +257,8 @@ public:
   }
 
 protected:
-  const double decay_rate_;
   const size_t max_num_buckets_;
+  const double decay_rate_;
 
   uint64_t generation_;
 

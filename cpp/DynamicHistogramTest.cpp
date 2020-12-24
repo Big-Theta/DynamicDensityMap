@@ -54,8 +54,9 @@ double exponential_sum(double a, double r, int n) {
 TEST(ReferenceTest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
-  DynamicHistogramReference uut(/*decay_rate=*/kDecayRate,
-                                /*max_num_buckets=*/31);
+  DynamicHistogramReference uut(
+      /*max_num_buckets=*/31,
+      /*decay_rate=*/kDecayRate);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -72,8 +73,9 @@ TEST(ReferenceTest, addNoDecay) {
 TEST(ReferenceTest, addWithDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.00001;
-  DynamicHistogramReference uut(/*decay_rate=*/kDecayRate,
-                                /*max_num_buckets=*/31);
+  DynamicHistogramReference uut(
+      /*max_num_buckets=*/31,
+      /*decay_rate=*/kDecayRate);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -99,8 +101,9 @@ TEST(ReferenceTest, addWithDecay) {
 
 TEST(ReferenceTest, addRandomNoDecay) {
   static constexpr int kNumValues = 100000;
-  DynamicHistogramReference uut(/*decay_rate=*/0.0,
-                                /*max_num_buckets=*/31);
+  DynamicHistogramReference uut(
+      /*max_num_buckets=*/31,
+      /*decay_rate=*/0.0);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -115,7 +118,8 @@ TEST(ReferenceTest, addRandomNoDecay) {
 
 TEST(ReferenceTest, trackQuantiles) {
   DynamicHistogramReference uut(
-      /*decay_rate=*/0.0, /*max_num_buckets=*/4,
+      /*max_num_buckets=*/4,
+      /*decay_rate=*/0.0,
       /*ubounds=*/std::vector<double>({0.25, 0.5, 0.75}),
       /*counts=*/std::vector<double>({100.0, 100.0, 100.0, 100.0}));
   uut.trackQuantiles(
@@ -134,7 +138,8 @@ TEST(ReferenceTest, trackQuantiles) {
 TEST(ReferenceTest, quantilesTracking) {
   static constexpr int kNumValues = 100000;
   DynamicHistogramReference uut(
-      /*decay_rate=*/0.0, /*max_num_buckets=*/31);
+      /*max_num_buckets=*/31,
+      /*decay_rate=*/0.0);
   uut.trackQuantiles(
       /*quantiles=*/std::vector<double>({0.01, 0.1, 0.25, 0.5, 0.9, 0.99}));
 
@@ -162,8 +167,8 @@ TEST(DynamicHistogramTest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
   DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/false> uut(
-      /*decay_rate=*/kDecayRate,
-      /*max_num_buckets=*/31);
+      /*max_num_buckets=*/31,
+      /*decay_rate=*/kDecayRate);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -183,8 +188,8 @@ TEST(DynamicHistogramTest, addWithDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.00001;
   DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/false> uut(
-      /*decay_rate=*/kDecayRate,
-      /*max_num_buckets=*/31);
+      /*max_num_buckets=*/31,
+      /*decay_rate=*/kDecayRate);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -214,7 +219,7 @@ TEST(DynamicHistogramTest, multithreadedStress) {
   std::thread threads[kNumThreads];
 
   DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/true> uut(
-      /*decay_rate=*/0.00001, /*max_num_buckets=*/31);
+      /*max_num_buckets=*/31, /*decay_rate=*/0.00001);
 
   for (int tx = 0; tx < kNumThreads; tx++) {
     threads[tx] = std::thread(
@@ -264,11 +269,12 @@ TYPED_TEST(DynamicHistogramTypedTest, referenceEquivalence) {
 
   TypeParam kThreadsafe;
 
-  DynamicHistogramReference ref(/*decay_rate=*/kDecayRate,
-                                /*max_num_buckets=*/kMaxNumBuckets);
+  DynamicHistogramReference ref(
+      /*max_num_buckets=*/kMaxNumBuckets,
+      /*decay_rate=*/kDecayRate);
   DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/kThreadsafe.val> dyn(
-      /*decay_rate=*/kDecayRate,
-      /*max_num_buckets=*/kMaxNumBuckets);
+      /*max_num_buckets=*/kMaxNumBuckets,
+      /*decay_rate=*/kDecayRate);
 
   std::default_random_engine gen;
   gen.seed(1);
