@@ -87,7 +87,7 @@ if __name__ == "__main__":
     for hist in hists:
         if maybe_histogram(hist):
             label = hist.get("label", "")
-            if len(hists) > 1 and "title" in hist:
+            if len(hists) > 1 and hist.get("title") and hist.get("label"):
                 label = hist["title"] + " -- " + label
 
             prepare_render(hist, label=label, alpha=1.0 / len(hists))
