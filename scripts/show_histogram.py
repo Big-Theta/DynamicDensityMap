@@ -40,23 +40,22 @@ def extract_histograms(data: List[str]) -> List[dict]:
         except json.decoder.JSONDecodeError:
             pass
 
-    # Make sure that only json objects that either have the keys "bounds" and
-    # "counts" or else have children with those keys.
-    filtered = []
-    for candidate in cleaned:
-        if maybe_histogram(candidate):
-            filtered.append(candidate)
-        else:
-            for value in candidate.values():
-                if not isinstance(value, dict) or not maybe_histogram(value):
-                    break
-            else:
-                filtered.append(candidate)
-
-    return filtered
+    # Make sure that only json objects with the keys "bounds" and
+    # "counts" are present.
+    return [c for c in cleaned if maybe_histogram(c)]
 
 
-def prepare_render(histogram: Dict, title: str = "", alpha: float = 1.0):
+colors = pyplot.rcParams["axes.prop_cycle"].by_key()["color"]
+color_index = 0
+
+def prepare_render(histogram: Dict, label: str = "", alpha: float = 1.0):
+    global color_index
+
+    color = colors[color_index]
+    color_index += 1
+    if color_index >= len(colors):
+        color_index = 0
+
     counts = np.array(histogram["counts"])
     total_count = sum(counts)
     weights = np.array([count / total_count for count in counts])
@@ -65,7 +64,7 @@ def prepare_render(histogram: Dict, title: str = "", alpha: float = 1.0):
     heights = weights.astype(np.float) / widths
     pyplot.fill_between(
             bins.repeat(2)[1:-1], heights.repeat(2),
-            color="steelblue", alpha=alpha)
+            color=color, alpha=alpha, label=label)
 
 
 if __name__ == "__main__":
@@ -75,7 +74,12 @@ if __name__ == "__main__":
     hists = extract_histograms(data)
 
     for hist in hists:
-        prepare_render(hist, alpha=1.0 / len(hists))
+        if maybe_histogram(hist):
+            label = hist.get("label", "")
+            if len(hists) > 1 and "title" in hist:
+                label = hist["title"] + " -- " + label
+
+            prepare_render(hist, label=label, alpha=1.0 / len(hists))
 
     pyplot.show()
 

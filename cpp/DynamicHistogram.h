@@ -209,11 +209,11 @@ public:
     }
     s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
          ", " + std::to_string(getMax()) +
-         "): " + std::to_string(counts_[i]) + "\n";
+         "): " + std::to_string(counts_[i]);
     return s;
   }
 
-  std::string json() {
+  std::string json(std::string title = "", std::string label = "") {
     int to_flush = reserve_flush_items();
     std::unique_ptr<std::scoped_lock<std::mutex>> lp;
     if (kThreadsafe) {
@@ -221,8 +221,14 @@ public:
     }
     flush<kThreadsafe>(to_flush);
 
-    std::string s;
-    s += "{\n  \"bounds\": [" + std::to_string(getMin()) + ", ";
+    std::string s("{\n");
+    if (!title.empty()) {
+      s += "  \"title\": " + title + ",\n";
+    }
+    if (!label.empty()) {
+      s += "  \"label\": " + label + ",\n";
+    }
+    s += "  \"bounds\": [" + std::to_string(getMin()) + ", ";
     for (int i = 0; i + 1 < ubounds_.size(); i++) {
       s += std::to_string(ubounds_[i]) + ", ";
     }
@@ -232,7 +238,7 @@ public:
     for (; i < counts_.size() - 1; i++) {
       s += std::to_string(counts_[i]) + ", ";
     }
-    s += std::to_string(counts_[i]) + "]\n}\n";
+    s += std::to_string(counts_[i]) + "]\n}";
     return s;
   }
 
