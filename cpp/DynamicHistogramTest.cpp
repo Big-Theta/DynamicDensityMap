@@ -68,6 +68,8 @@ TEST(ReferenceTest, addNoDecay) {
   EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1);
   EXPECT_NEAR(uut.getQuantileEstimate(0.05), -1.644854, 1e-1);
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
+
+  EXPECT_NEAR(uut.getMean(), 0.0, 1e-1);
 }
 
 TEST(ReferenceTest, addWithDecay) {

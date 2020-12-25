@@ -137,6 +137,24 @@ public:
     return total_count_;
   }
 
+  double getMean() {
+    // TODO(lpe): This snippet repeats a few times. Why?
+    int to_flush = reserve_flush_items();
+    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
+    if (kThreadsafe) {
+      lp.reset(new std::scoped_lock(flush_mu_));
+    }
+    flush<kThreadsafe>(to_flush);
+
+    double acc = counts_[0] * (ubounds_[0] + getMin());
+    int i = 1;
+    for (; i < counts_.size() - 1; i++) {
+      acc += counts_[i] * (ubounds_[i] + ubounds_[i - 1]);
+    }
+    acc += counts_[i] * (getMax() + ubounds_[i]);
+    return acc / computeTotalCount() / 2.0;
+  }
+
   // quantile is in [0, 1]
   double getQuantileEstimate(double quantile) {
     int to_flush = reserve_flush_items();

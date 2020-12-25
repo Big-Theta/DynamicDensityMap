@@ -120,6 +120,16 @@ public:
     return total_count;
   }
 
+  double getMean() {
+    double acc = counts_[0] * (ubounds_[0] + getMin()) / 2.0;
+    int i = 1;
+    for (; i < counts_.size() - 1; i++) {
+      acc += counts_[i] * (ubounds_[i] + ubounds_[i - 1]) / 2.0;
+    }
+    acc += counts_[i] * (getMax() + ubounds_[i]) / 2.0;
+    return acc / computeTotalCount();
+  }
+
   // quantile is in [0, 1]
   double getQuantileEstimate(double quantile) const {
     double total_count = computeTotalCount();
