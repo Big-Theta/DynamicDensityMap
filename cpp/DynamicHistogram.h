@@ -152,7 +152,7 @@ public:
       acc += counts_[i] * (ubounds_[i] + ubounds_[i - 1]);
     }
     acc += counts_[i] * (getMax() + ubounds_[i]);
-    return acc / computeTotalCount() / 2.0;
+    return acc / total_count_ / 2.0;
   }
 
   // quantile is in [0, 1]
