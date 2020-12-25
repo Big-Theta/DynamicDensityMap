@@ -146,13 +146,21 @@ public:
     }
     flush<kThreadsafe>(to_flush);
 
-    double acc = counts_[0] * (ubounds_[0] + getMin()) / 2;
+    double mean = counts_[0] * (getMin() + ubounds_[0]) / 2;
+    double running_count = counts_[0];
+
     int i = 1;
     for (; i < counts_.size() - 1; i++) {
-      acc += counts_[i] * (ubounds_[i] + ubounds_[i - 1]) / 2;
+      running_count += counts_[i];
+      const double new_val = (ubounds_[i - 1] + ubounds_[i]) / 2;
+      const double delta = new_val - mean;
+      mean += delta / running_count;
     }
-    acc += counts_[i] * (getMax() + ubounds_[i]) / 2;
-    return acc / total_count_;
+
+    const double new_val = (ubounds_[i] + getMax()) / 2;
+    const double delta = new_val - mean;
+    mean += delta / running_count;
+    return mean;
   }
 
   // quantile is in [0, 1]

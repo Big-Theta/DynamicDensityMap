@@ -45,11 +45,23 @@ def extract_histograms(data: List[str]) -> List[dict]:
     return [c for c in cleaned if maybe_histogram(c)]
 
 
+def compute_mean(histogram: Dict) -> float:
+    acc = 0.0
+    total = 0.0
+    for i in range(len(histogram["bounds"]) - 1):
+        acc += (histogram["counts"][i]
+                * (histogram["bounds"][i] + histogram["bounds"][i + 1])
+                / 2)
+        total += histogram["counts"][i]
+    return acc / total
+
+
 colors = pyplot.rcParams["axes.prop_cycle"].by_key()["color"]
 color_index = 0
 
 def prepare_render(histogram: Dict, label: str = "", alpha: float = 1.0):
     global color_index
+    print("mean:", compute_mean(histogram))
 
     color = colors[color_index]
     color_index += 1
