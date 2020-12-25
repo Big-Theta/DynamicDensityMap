@@ -138,7 +138,6 @@ public:
   }
 
   double getMean() {
-    // TODO(lpe): This snippet repeats a few times. Why?
     int to_flush = reserve_flush_items();
     std::unique_ptr<std::scoped_lock<std::mutex>> lp;
     if (kThreadsafe) {
@@ -146,20 +145,16 @@ public:
     }
     flush<kThreadsafe>(to_flush);
 
-    double mean = counts_[0] * (getMin() + ubounds_[0]) / 2;
-    double running_count = counts_[0];
+    double mean = 0.0;
+    mean += counts_[0] * (getMin() + ubounds_[0]) / 2 / total_count_;
 
     int i = 1;
     for (; i < counts_.size() - 1; i++) {
-      running_count += counts_[i];
       const double new_val = (ubounds_[i - 1] + ubounds_[i]) / 2;
-      const double delta = new_val - mean;
-      mean += delta / running_count;
+      mean += counts_[i] * new_val / total_count_;
     }
 
-    const double new_val = (ubounds_[i] + getMax()) / 2;
-    const double delta = new_val - mean;
-    mean += delta / running_count;
+    mean += counts_[i] * (ubounds_[i - 1] + getMax()) / 2 / total_count_;
     return mean;
   }
 
@@ -223,12 +218,12 @@ public:
 
     std::string s;
     s += "generation: " + std::to_string(total_count_) + "\n"
-         "total_count: " + std::to_string(computeTotalCount()) + "\n";
+         "total_count: " + std::to_string(total_count_) + "\n";
     s += "  " + std::to_string(0) + " [" + std::to_string(getMin()) + ", " +
          std::to_string(ubounds_[0]) + "): " + std::to_string(counts_[0]) +
          "\n";
     int i = 1;
-    for (; i < ubounds_.size() - 1; i++) {
+    for (; i < counts_.size() - 1; i++) {
       s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
            ", " + std::to_string(ubounds_[i]) +
            "): " + std::to_string(counts_[i]) + "\n";
@@ -388,7 +383,9 @@ protected:
   }
 
   int reserve_flush_items() {
-    // TODO: Could this just use an atomic for insert_queue_to_flush_?
+    // TODO(lpe): Could this just use an atomic for insert_queue_to_flush_?
+    // TODO(lpe): It doesn't look like thie lock is disabled when
+    //   kThreadsafe == false. What's up with that?
     std::scoped_lock l(insert_mu_);
     int to_flush = insert_queue_to_flush_;
     insert_queue_to_flush_ = 0;

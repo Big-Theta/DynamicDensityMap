@@ -61,7 +61,6 @@ color_index = 0
 
 def prepare_render(histogram: Dict, label: str = "", alpha: float = 1.0):
     global color_index
-    print("mean:", compute_mean(histogram))
 
     color = colors[color_index]
     color_index += 1

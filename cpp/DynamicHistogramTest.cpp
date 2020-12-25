@@ -251,6 +251,20 @@ TEST(DynamicHistogramTest, multithreadedStress) {
   }
 }
 
+TEST(DynamicHistogramTest, getMean) {
+  DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/true> uut(
+      /*max_num_buckets=*/61);
+  std::normal_distribution<double> norm(10000.0, 1.0);
+  std::default_random_engine gen;
+
+  static constexpr int kNumValues = 100000;
+  for (int i = 0; i < kNumValues; i++) {
+    uut.addValue(norm(gen));
+  }
+
+  EXPECT_NEAR(uut.getMean(), 10000.0, 1e-1);
+}
+
 struct TypedTestTrue {
   static constexpr bool val = true;
 };
