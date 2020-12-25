@@ -223,10 +223,10 @@ public:
 
     std::string s("{\n");
     if (!title.empty()) {
-      s += "  \"title\": " + title + ",\n";
+      s += "  \"title\": \"" + title + "\",\n";
     }
     if (!label.empty()) {
-      s += "  \"label\": " + label + ",\n";
+      s += "  \"label\": \"" + label + "\",\n";
     }
     s += "  \"bounds\": [" + std::to_string(getMin()) + ", ";
     for (int i = 0; i + 1 < ubounds_.size(); i++) {
