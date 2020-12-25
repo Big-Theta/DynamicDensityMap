@@ -10,7 +10,7 @@ import json
 def maybe_histogram(data: Dict) -> bool:
     if (isinstance(data.get("bounds"), list)
         and isinstance(data.get("counts"), list)
-        and len(data["bounds"]) == len(data["counts"]) - 1
+        and len(data["bounds"]) == len(data["counts"]) + 1
     ):
         return True
     return False
@@ -57,15 +57,12 @@ def extract_histograms(data: List[str]) -> List[dict]:
 
 
 def prepare_render(histogram: Dict, title: str = "", alpha: float = 1.0):
-    print(histogram)
     counts = np.array(histogram["counts"])
     total_count = sum(counts)
     weights = np.array([count / total_count for count in counts])
     bins = np.array(histogram["bounds"])
     widths = bins[1:] - bins[:-1]
-    print(widths)
     heights = weights.astype(np.float) / widths
-    print(heights)
     pyplot.fill_between(
             bins.repeat(2)[1:-1], heights.repeat(2),
             color="steelblue", alpha=alpha)
@@ -73,6 +70,7 @@ def prepare_render(histogram: Dict, title: str = "", alpha: float = 1.0):
 
 if __name__ == "__main__":
     data = sys.stdin.read()
+    print(data)
 
     hists = extract_histograms(data)
 
