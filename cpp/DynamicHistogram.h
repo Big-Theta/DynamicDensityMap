@@ -146,13 +146,13 @@ public:
     }
     flush<kThreadsafe>(to_flush);
 
-    double acc = counts_[0] * (ubounds_[0] + getMin());
+    double acc = counts_[0] * (ubounds_[0] + getMin()) / 2;
     int i = 1;
     for (; i < counts_.size() - 1; i++) {
-      acc += counts_[i] * (ubounds_[i] + ubounds_[i - 1]);
+      acc += counts_[i] * (ubounds_[i] + ubounds_[i - 1]) / 2;
     }
-    acc += counts_[i] * (getMax() + ubounds_[i]);
-    return acc / total_count_ / 2.0;
+    acc += counts_[i] * (getMax() + ubounds_[i]) / 2;
+    return acc / total_count_;
   }
 
   // quantile is in [0, 1]
