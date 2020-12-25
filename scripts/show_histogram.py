@@ -81,5 +81,6 @@ if __name__ == "__main__":
 
             prepare_render(hist, label=label, alpha=1.0 / len(hists))
 
+    pyplot.legend()
     pyplot.show()
 
