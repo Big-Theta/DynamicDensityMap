@@ -16,10 +16,11 @@ def maybe_histogram(data: Dict) -> bool:
     return False
 
 
-def extract_histograms(data: List[str]) -> List[dict]:
+def extract_histograms(data: str) -> List[dict]:
     candidates = []
     open_brace = None
     nest_count = 0
+    data = data.replace("\n", "")
     for i, ch in enumerate(data):
         if ch == "{":
             if nest_count == 0:
