@@ -81,18 +81,22 @@ def prepare_render(histogram: Dict, label: str = "", alpha: float = 1.0):
 
 if __name__ == "__main__":
     data = sys.stdin.read()
-    print(data)
 
     hists = extract_histograms(data)
+    print(hists)
+    title = None
 
     for hist in hists:
         if maybe_histogram(hist):
             label = hist.get("label", "")
-            if len(hists) > 1 and hist.get("title") and hist.get("label"):
-                label = hist["title"] + " -- " + label
+
+            if hist.get("title"):
+                title = hist.get("title")
 
             prepare_render(hist, label=label, alpha=1.0 / len(hists))
 
     pyplot.legend()
+    if title:
+        pyplot.title(title)
     pyplot.show()
 
