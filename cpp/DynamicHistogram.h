@@ -253,7 +253,7 @@ public:
     double count = 0.0;
     for (int i = 0; i < counts_.size(); i++) {
       if (ubounds_[i] >= value) {
-        count += counts_.[i];
+        count += counts_[i];
       } else {
         count += (getUpperBound(i) - value) /
                  (getUpperBound(i) - getUpperBound(i - 1));
