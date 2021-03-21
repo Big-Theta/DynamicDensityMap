@@ -149,6 +149,16 @@ public:
            (counts_[bx + 1] / counts_[bx]) * (ubounds_[bx] - ubounds_[bx - 1]);
   }
 
+  double getUpperBound(int i) const {
+    if (i == -1) {
+      return getMin();
+    }
+    if (i == ubounds_.size()) {
+      return getMax();
+    }
+    return ubounds_[i];
+  }
+
   double computeTotalCount() {
     int to_flush = reserve_flush_items();
     std::unique_ptr<std::scoped_lock<std::mutex>> lp;
@@ -222,6 +232,36 @@ public:
     }
 
     return frac * (upper_bound - lower_bound) + lower_bound;
+  }
+
+  double getQuantileOfValue(double value) {
+    int to_flush = reserve_flush_items();
+    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
+    if (kThreadsafe) {
+      lp.reset(new std::scoped_lock(flush_mu_));
+    }
+    flush<kThreadsafe>(to_flush);
+
+    if (value <= getMin()) {
+      return getMin();
+    }
+
+    if (value >= getMax()) {
+      return getMax();
+    }
+
+    double count = 0.0;
+    for (int i = 0; i < counts_.size(); i++) {
+      if (ubounds_[i] >= value) {
+        count += counts_.[i];
+      } else {
+        count += (getUpperBound(i) - value) /
+                 (getUpperBound(i) - getUpperBound(i - 1));
+        break;
+      }
+    }
+
+    return count / computeTotalCount();
   }
 
   void trackQuantiles(const std::vector<double> &quantiles) {}
