@@ -1,19 +1,22 @@
 #include <algorithm>
 #include <cstddef>
+#include <fstream>
+#include <iostream>
 #include <random>
 #include <string>
 #include <thread>
 #include <vector>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
+#include "cpp/DensityMap.pb.h"
 #include "cpp/DynamicHistogram.h"
 #include "cpp/DynamicHistogramReference.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using dhist::DynamicHistogram;
 using dhist::DynamicHistogramReference;
 using dhist::in_range;
+using dynamic_histogram::DensityMap;
 using testing::ContainerEq;
 using testing::Eq;
 using testing::Types;
@@ -265,6 +268,32 @@ TEST(DynamicHistogramTest, getMean) {
   EXPECT_NEAR(uut.getMean(), 10000.0, 1e-1);
 }
 
+TEST(DynamicHistogramTest, toProto) {
+  DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/true> uut(
+      /*max_num_buckets=*/61);
+  std::normal_distribution<double> norm(10000.0, 1.0);
+  std::default_random_engine gen;
+
+  static constexpr int kNumValues = 100000;
+  for (int i = 0; i < kNumValues; i++) {
+    uut.addValue(norm(gen));
+  }
+
+  DensityMap dm = uut.to_proto("test", "x-value");
+
+  EXPECT_EQ(dm.dynamic_histogram().title(), "test");
+  EXPECT_EQ(dm.dynamic_histogram().label(), "x-value");
+  EXPECT_EQ(dm.dynamic_histogram().bounds()[0], uut.getMin());
+  EXPECT_EQ(
+      dm.dynamic_histogram().bounds()[dm.dynamic_histogram().bounds_size() - 1],
+      uut.getMax());
+
+  //std::ofstream myfile("~/repos/DynamicHistogram/cpp/DensityMapTest.pb",
+  //                     std::ios::out | std::ios::binary);
+  //EXPECT_TRUE(dm.SerializeToOstream(&myfile));
+  //myfile.close();
+}
+
 struct TypedTestTrue {
   static constexpr bool val = true;
 };
@@ -281,7 +310,7 @@ TYPED_TEST_SUITE(DynamicHistogramTypedTest, test_types);
 TYPED_TEST(DynamicHistogramTypedTest, referenceEquivalence) {
   static constexpr double kDecayRate = 0.0001;
   static constexpr int kMaxNumBuckets = 31;
-  static constexpr int kNumValues = 1;
+  static constexpr int kNumValues = 10000;
 
   TypeParam kThreadsafe;
 

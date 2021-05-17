@@ -1,6 +1,13 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+
 cc_library(
     name = "dynamic_histogram",
     hdrs = ["cpp/DynamicHistogram.h"],
+    deps = [
+        ":density_map_cc_proto",
+        ":timestamp_cc_proto",
+    ],
     copts = [
         "-std=c++17",
     ],
@@ -20,6 +27,7 @@ cc_test(
     name = "dynamic_histogram_test",
     srcs = ["cpp/DynamicHistogramTest.cpp"],
     deps = [
+        ":density_map_cc_proto",
         ":dynamic_histogram",
         ":dynamic_histogram_reference",
         "@gtest//:gtest",
@@ -42,3 +50,20 @@ cc_binary(
         "-std=c++17",
     ],
 )
+
+proto_library(
+    name = "density_map_proto",
+    srcs = ["cpp/DensityMap.proto"],
+    deps = ["@com_google_protobuf//:timestamp_proto"],
+)
+
+cc_proto_library(
+    name = "density_map_cc_proto",
+    deps = [":density_map_proto"],
+)
+
+cc_proto_library(
+    name = "timestamp_cc_proto",
+    deps = ["@com_google_protobuf//:timestamp_proto"],
+)
+

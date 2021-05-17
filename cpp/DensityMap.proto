@@ -1,0 +1,38 @@
+syntax = "proto2";
+
+package dynamic_histogram;
+
+import "google/protobuf/timestamp.proto";
+
+message DynamicHistogram {
+  optional string title = 1;
+  optional string label = 2;
+  optional google.protobuf.Timestamp timestamp = 3;
+  optional bool decay = 4;
+  repeated double bounds = 5;
+  repeated double counts = 6;
+}
+
+message DynamicKDE {
+  // Kernel represents 1-d data by using a single value for both coord and
+  // variance and no covariance. It represents 2-d data with two values for
+  // each coord and variance and a single value for covariance.
+  message Kernel {
+    repeated double coord = 1;
+    repeated double variance = 2;
+    optional double covariance = 3;
+  }
+
+  optional string title = 1;
+  repeated string label = 2;
+  optional google.protobuf.Timestamp timestamp = 3;
+  optional bool decay = 4;
+  repeated Kernel kernels = 5;
+}
+
+message DensityMap {
+    oneof density_map {
+        DynamicHistogram dynamic_histogram = 1;
+        DynamicKDE dynamic_kde = 2;
+    }
+}

@@ -23,6 +23,8 @@
 #ifndef DYNAMIC_HISTOGRAM_H
 #define DYNAMIC_HISTOGRAM_H
 
+#include <google/protobuf/util/time_util.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -33,14 +35,19 @@
 #include <mutex>
 #include <vector>
 
+#include "cpp/DensityMap.pb.h"
+
 namespace dhist {
+
+using ::dynamic_histogram::DensityMap;
+using ::google::protobuf::Timestamp;
 
 bool in_range(double val, double a, double b) {
   return ((val <= a) ^ (val <= b)) || val == a || val == b;
 }
 
 class Bucket {
-public:
+ public:
   // Represents data in the half-open interval [min, max).
   Bucket(double min, double max, double count)
       : min_(min), max_(max), count_(count) {}
@@ -53,7 +60,7 @@ public:
 
   double count() const { return count_; }
 
-private:
+ private:
   double min_;
   double max_;
   double count_;
@@ -61,13 +68,18 @@ private:
 
 template <bool kUseDecay = true, bool kThreadsafe = true>
 class DynamicHistogram {
-public:
+ public:
   DynamicHistogram(size_t max_num_buckets, double decay_rate = 0.0,
                    int refresh_interval = 512)
-      : max_num_buckets_(max_num_buckets), decay_rate_(decay_rate),
-        refresh_interval_(refresh_interval), generation_(0),
-        refresh_generation_(0), total_count_(0.0), insert_queue_begin_(0),
-        insert_queue_end_(0), insert_queue_to_flush_(0) {
+      : max_num_buckets_(max_num_buckets),
+        decay_rate_(decay_rate),
+        refresh_interval_(refresh_interval),
+        generation_(0),
+        refresh_generation_(0),
+        total_count_(0.0),
+        insert_queue_begin_(0),
+        insert_queue_end_(0),
+        insert_queue_to_flush_(0) {
     assert(kUseDecay == (decay_rate != 0.0));
     ubounds_.resize(max_num_buckets_);
     ubounds_.back() = std::numeric_limits<double>::max();
@@ -279,8 +291,10 @@ public:
     flush<kThreadsafe>(to_flush);
 
     std::string s;
-    s += "generation: " + std::to_string(total_count_) + "\n"
-         "total_count: " + std::to_string(total_count_) + "\n";
+    s += "generation: " + std::to_string(total_count_) +
+         "\n"
+         "total_count: " +
+         std::to_string(total_count_) + "\n";
     s += "  " + std::to_string(0) + " [" + std::to_string(getMin()) + ", " +
          std::to_string(ubounds_[0]) + "): " + std::to_string(counts_[0]) +
          "\n";
@@ -291,8 +305,7 @@ public:
            "): " + std::to_string(counts_[i]) + "\n";
     }
     s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
-         ", " + std::to_string(getMax()) +
-         "): " + std::to_string(counts_[i]);
+         ", " + std::to_string(getMax()) + "): " + std::to_string(counts_[i]);
     return s;
   }
 
@@ -325,7 +338,46 @@ public:
     return s;
   }
 
-protected:
+  DensityMap to_proto(std::string title = "", std::string label = "") {
+    DensityMap dm;
+    auto *dhist = dm.mutable_dynamic_histogram();
+
+    if (!title.empty()) {
+      dhist->set_title(title);
+    }
+
+    if (!label.empty()) {
+      dhist->set_label(label);
+    }
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    dhist->mutable_timestamp()->set_seconds(tv.tv_sec);
+    dhist->mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
+
+    dhist->set_decay(kUseDecay);
+
+    int to_flush = reserve_flush_items();
+    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
+    if (kThreadsafe) {
+      lp.reset(new std::scoped_lock(flush_mu_));
+    }
+    flush<kThreadsafe>(to_flush);
+
+    dhist->add_bounds(getMin());
+    for (int i = 0; i + 1 < ubounds_.size(); i++) {
+      dhist->add_bounds(ubounds_[i]);
+    }
+    dhist->add_bounds(getMax());
+
+    for (int i = 0; i < counts_.size(); i++) {
+      dhist->add_counts(counts_[i]);
+    }
+
+    return dm;
+  }
+
+ protected:
   const size_t max_num_buckets_;
   const double decay_rate_;
   const int refresh_interval_;
@@ -351,9 +403,11 @@ protected:
   std::vector<double> quantile_locations_;
   std::vector<double> decay_factors_;
 
-  template <bool threadsafe> int insert_queue_count() const;
+  template <bool threadsafe>
+  int insert_queue_count() const;
 
-  template <> int insert_queue_count</*threadsafe=*/true>() const {
+  template <>
+  int insert_queue_count</*threadsafe=*/true>() const {
     int size = insert_queue_end_ - insert_queue_begin_;
     if (size < 0) {
       size += insert_queue_.size();
@@ -361,11 +415,16 @@ protected:
     return size;
   }
 
-  template <> int insert_queue_count</*threadsafe=*/false>() const { return 0; }
+  template <>
+  int insert_queue_count</*threadsafe=*/false>() const {
+    return 0;
+  }
 
-  template <bool threadsafe> void flush(int items);
+  template <bool threadsafe>
+  void flush(int items);
 
-  template <> void flush</*threadsafe=*/true>(int items) {
+  template <>
+  void flush</*threadsafe=*/true>(int items) {
     const int size = insert_queue_.size();
     int qx = insert_queue_begin_;
     for (int i = 0; i < items; i++) {
@@ -380,11 +439,16 @@ protected:
     refresh();
   }
 
-  template <> void flush</*threadsafe=*/false>(int items) { refresh(); }
+  template <>
+  void flush</*threadsafe=*/false>(int items) {
+    refresh();
+  }
 
-  template <bool threadsafe> void addValueImpl(double val);
+  template <bool threadsafe>
+  void addValueImpl(double val);
 
-  template <> void addValueImpl</*threadsafe=*/true>(double val) {
+  template <>
+  void addValueImpl</*threadsafe=*/true>(double val) {
     std::scoped_lock insert_lock(insert_mu_);
 
     while (kThreadsafe &&
@@ -409,7 +473,8 @@ protected:
     }
   }
 
-  template <> void addValueImpl</*threadsafe=*/false>(double val) {
+  template <>
+  void addValueImpl</*threadsafe=*/false>(double val) {
     generation_++;
 
     // decay();
@@ -632,6 +697,6 @@ protected:
   }
 };
 
-} // namespace dhist
+}  // namespace dhist
 
-#endif // DYNAMIC_HISTOGRAM_H
+#endif  // DYNAMIC_HISTOGRAM_H
