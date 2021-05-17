@@ -1,28 +1,25 @@
 #!/usr/bin/env python3
 
-from cpp import DensityMap_pb2
 from matplotlib import animation
 from matplotlib import pyplot
 from typing import Dict, List
 
 import argparse
+import DensityMap_pb2
 import json
 import numpy as np
 import os
 import sys
 
-parser = argparse.ArgumentParser(description='Process some integers.')
+parser = argparse.ArgumentParser(description='Display a dynamic density map.')
 parser.add_argument("--stdin", type=bool, default=False)
-parser.add_argument("--animage", type=bool, default=False)
+parser.add_argument("--animate", type=bool, default=False)
 parser.add_argument("--proto", type=str, default="")
 args = parser.parse_args()
 
 
-def maybe_histogram(data: Dict) -> bool:
-    if (isinstance(data.get("bounds"), list)
-        and isinstance(data.get("counts"), list)
-        and len(data["bounds"]) == len(data["counts"]) + 1
-    ):
+def check_histogram(data: Dict) -> bool:
+    if len(data["bounds"]) == len(data["counts"]) + 1:
         return True
     return False
 
@@ -54,7 +51,19 @@ def extract_histograms(data: str) -> List[dict]:
 
     # Make sure that only json objects with the keys "bounds" and
     # "counts" are present.
-    return [c for c in cleaned if maybe_histogram(c)]
+    return [c for c in cleaned if check_histogram(c)]
+
+
+def proto_to_histogram(proto: DensityMap_pb2.DynamicHistogram) -> dict:
+    hist = {
+        "bounds": proto.bounds,
+        "counts": proto.counts,
+    }
+    if proto.HasField("title"):
+        hist["title"] = proto.title
+    if proto.HasField("label"):
+        hist["label"] = proto.label
+    return hist
 
 
 def gen_histograms(data: str):
@@ -89,7 +98,7 @@ def gen_histograms(data: str):
         except json.decoder.JSONDecodeError:
             continue
 
-        if maybe_histogram(cleaned):
+        if check_histogram(cleaned):
             yield cleaned
 
 
@@ -161,11 +170,10 @@ if __name__ == "__main__":
             exit()
 
         hists = extract_histograms(data)
-        print(hists)
         title = None
 
         for hist in hists:
-            if maybe_histogram(hist):
+            if check_histogram(hist):
                 label = hist.get("label", "")
 
                 if hist.get("title"):
@@ -179,14 +187,32 @@ if __name__ == "__main__":
         pyplot.show()
 
     elif args.proto:
-        print(os.listdir(os.curdir))
-        print(os.path.abspath(os.curdir))
-        for a, b in os.environ.items():
-            if "repos" in b:
-                print()
-                print(a)
-                print(b)
-                print()
-        with open(args.proto, "rb") as proto_in:
-            dhist = DensityMap_pb2.ParseFromString(proto_in.read())
-            print(dhist)
+        if args.proto.startswith('/'):
+            path = args.proto
+        else:
+            for d in [os.environ["BUILD_WORKING_DIRECTORY"],
+                      os.environ["OLDPWD"],
+                      os.path.abspath(os.curdir)]:
+                p = os.path.join(d, args.proto)
+                if os.path.exists(p):
+                    path = p
+                    break
+            else:
+                raise FileNotFoundError(f"Unable to find file '{args.proto}'")
+
+        #print(help(DensityMap_pb2.DensityMap.ParseFromString))
+        with open(path, "rb") as proto_in:
+            serialized = proto_in.read()
+        dhist = DensityMap_pb2.DensityMap()
+        dhist.ParseFromString(serialized)
+        hist = proto_to_histogram(dhist.dynamic_histogram)
+        assert(check_histogram(hist))
+
+        pyplot.title(hist.get("title", ""))
+        label = hist.get("label", "")
+        prepare_render(hist, label=label, alpha=1.0)
+        pyplot.legend()
+        pyplot.show()
+    else:
+        parser.print_help()
+
