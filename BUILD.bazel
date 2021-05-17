@@ -53,7 +53,7 @@ cc_binary(
 
 proto_library(
     name = "density_map_proto",
-    srcs = ["cpp/DensityMap.proto"],
+    srcs = ["DensityMap.proto"],
     deps = ["@com_google_protobuf//:timestamp_proto"],
 )
 
@@ -67,3 +67,16 @@ cc_proto_library(
     deps = ["@com_google_protobuf//:timestamp_proto"],
 )
 
+py_proto_library(
+    name = "density_map_py_proto",
+    srcs = ["DensityMap.proto"],
+    deps = ["@com_google_protobuf//:protobuf_python"],
+)
+
+py_binary(
+    name = "show_histogram",
+    srcs = ["show_histogram.py"],
+    deps = [
+        ":density_map_py_proto",
+    ],
+)

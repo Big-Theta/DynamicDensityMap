@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 
-from matplotlib import pyplot
+from cpp import DensityMap_pb2
 from matplotlib import animation
+from matplotlib import pyplot
 from typing import Dict, List
-import numpy as np
-import sys
+
+import argparse
 import json
+import numpy as np
+import os
+import sys
+
+parser = argparse.ArgumentParser(description='Process some integers.')
+parser.add_argument("--stdin", type=bool, default=False)
+parser.add_argument("--animage", type=bool, default=False)
+parser.add_argument("--proto", type=str, default="")
+args = parser.parse_args()
 
 
 def maybe_histogram(data: Dict) -> bool:
@@ -143,27 +153,40 @@ def animate(data: str):
     pyplot.show()
 
 if __name__ == "__main__":
-    data = sys.stdin.read()
+    if args.stdin:
+        data = sys.stdin.read()
 
-    if True:
-        animate(data)
-        exit()
+        if args.animate:
+            animate(data)
+            exit()
 
-    hists = extract_histograms(data)
-    print(hists)
-    title = None
+        hists = extract_histograms(data)
+        print(hists)
+        title = None
 
-    for hist in hists:
-        if maybe_histogram(hist):
-            label = hist.get("label", "")
+        for hist in hists:
+            if maybe_histogram(hist):
+                label = hist.get("label", "")
 
-            if hist.get("title"):
-                title = hist.get("title")
+                if hist.get("title"):
+                    title = hist.get("title")
 
-            prepare_render(hist, label=label, alpha=1.0 / len(hists))
+                prepare_render(hist, label=label, alpha=1.0 / len(hists))
 
-    pyplot.legend()
-    if title:
-        pyplot.title(title)
-    pyplot.show()
+        pyplot.legend()
+        if title:
+            pyplot.title(title)
+        pyplot.show()
 
+    elif args.proto:
+        print(os.listdir(os.curdir))
+        print(os.path.abspath(os.curdir))
+        for a, b in os.environ.items():
+            if "repos" in b:
+                print()
+                print(a)
+                print(b)
+                print()
+        with open(args.proto, "rb") as proto_in:
+            dhist = DensityMap_pb2.ParseFromString(proto_in.read())
+            print(dhist)

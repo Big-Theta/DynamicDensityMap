@@ -35,7 +35,7 @@
 #include <mutex>
 #include <vector>
 
-#include "cpp/DensityMap.pb.h"
+#include "DensityMap.pb.h"
 
 namespace dhist {
 
