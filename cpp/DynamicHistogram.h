@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "DensityMap.pb.h"
+#include "cpp/InsertionBuffer.h"
 
 namespace dhist {
 
@@ -65,7 +66,6 @@ class Bucket {
   double count_;
 };
 
-template <bool kUseDecay = true, bool kThreadsafe = true>
 class DynamicHistogram {
  public:
   DynamicHistogram(size_t max_num_buckets, double decay_rate = 0.0,
@@ -76,17 +76,13 @@ class DynamicHistogram {
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
-        insert_queue_begin_(0),
-        insert_queue_end_(0),
-        insert_queue_to_flush_(0) {
-    assert(kUseDecay == (decay_rate != 0.0));
+        insertion_buffer_(/*buffer_size=*/2 * refresh_interval) {
     ubounds_.resize(max_num_buckets_);
     ubounds_.back() = std::numeric_limits<double>::max();
     counts_.resize(max_num_buckets_);
     bucket_generation_.resize(max_num_buckets_);
-    insert_queue_.resize(refresh_interval_);
 
-    if (kUseDecay) {
+    if (decay_rate_ != 0.0) {
       decay_factors_.resize(refresh_interval_);
       double decay = 1.0;
       for (int i = 0; i < refresh_interval_; i++) {
@@ -98,22 +94,13 @@ class DynamicHistogram {
 
   virtual ~DynamicHistogram() {}
 
-  void addValue(double val) { addValueImpl<kThreadsafe>(val); }
-
-  void addRepeatedValue(double val, uint64_t nValues) {
-    for (int i = 0; i < nValues; i++) {
-      addValue(val);
+  void addValue(double val) {
+    size_t unflushed = insertion_buffer_.addValue(val);
+    if (unflushed >= refresh_interval_) {
+      auto flush_it = insertion_buffer_.lockedIterator();
+      flush(&flush_it);
     }
   }
-
-  // TODO(lpe)
-  void clear() { assert(false); }
-
-  // TODO(lpe)
-  void merge(const DynamicHistogram &other) { assert(false); }
-
-  // TODO(lpe)
-  void copy(const DynamicHistogram &other) { assert(false); }
 
   size_t getNumBuckets() { return counts_.size(); }
 
@@ -171,22 +158,14 @@ class DynamicHistogram {
   }
 
   double computeTotalCount() {
-    int to_flush = reserve_flush_items();
-    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
-    if (kThreadsafe) {
-      lp.reset(new std::scoped_lock(flush_mu_));
-    }
-    flush<kThreadsafe>(to_flush);
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
     return total_count_;
   }
 
   double getMean() {
-    int to_flush = reserve_flush_items();
-    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
-    if (kThreadsafe) {
-      lp.reset(new std::scoped_lock(flush_mu_));
-    }
-    flush<kThreadsafe>(to_flush);
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
 
     double mean = 0.0;
     mean += counts_[0] * (getMin() + ubounds_[0]) / 2 / total_count_;
@@ -203,12 +182,8 @@ class DynamicHistogram {
 
   // quantile is in [0, 1]
   double getQuantileEstimate(double quantile) {
-    int to_flush = reserve_flush_items();
-    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
-    if (kThreadsafe) {
-      lp.reset(new std::scoped_lock(flush_mu_));
-    }
-    flush<kThreadsafe>(to_flush);
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
 
     if (total_count_ == 0.0) {
       return 0.0;
@@ -246,12 +221,8 @@ class DynamicHistogram {
   }
 
   double getQuantileOfValue(double value) {
-    int to_flush = reserve_flush_items();
-    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
-    if (kThreadsafe) {
-      lp.reset(new std::scoped_lock(flush_mu_));
-    }
-    flush<kThreadsafe>(to_flush);
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
 
     if (value <= getMin()) {
       return getMin();
@@ -282,12 +253,8 @@ class DynamicHistogram {
   }
 
   std::string debugString() {
-    int to_flush = reserve_flush_items();
-    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
-    if (kThreadsafe) {
-      lp.reset(new std::scoped_lock(flush_mu_));
-    }
-    flush<kThreadsafe>(to_flush);
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
 
     std::string s;
     s += "generation: " + std::to_string(total_count_) +
@@ -309,12 +276,8 @@ class DynamicHistogram {
   }
 
   std::string json(std::string title = "", std::string label = "") {
-    int to_flush = reserve_flush_items();
-    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
-    if (kThreadsafe) {
-      lp.reset(new std::scoped_lock(flush_mu_));
-    }
-    flush<kThreadsafe>(to_flush);
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
 
     std::string s("{\n");
     if (!title.empty()) {
@@ -354,14 +317,10 @@ class DynamicHistogram {
     dhist->mutable_timestamp()->set_seconds(tv.tv_sec);
     dhist->mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
 
-    dhist->set_decay(kUseDecay);
+    dhist->set_decay_rate(decay_rate_);
 
-    int to_flush = reserve_flush_items();
-    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
-    if (kThreadsafe) {
-      lp.reset(new std::scoped_lock(flush_mu_));
-    }
-    flush<kThreadsafe>(to_flush);
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
 
     dhist->add_bounds(getMin());
     for (int i = 0; i + 1 < ubounds_.size(); i++) {
@@ -384,12 +343,8 @@ class DynamicHistogram {
   uint64_t generation_;
   uint64_t refresh_generation_;
   double total_count_;
-  int insert_queue_begin_;
-  int insert_queue_end_;
-  int insert_queue_to_flush_;
 
-  std::mutex insert_mu_;
-  std::mutex flush_mu_;
+  InsertionBuffer<double> insertion_buffer_;
 
   // ubounds_ records the upper bound of a bucket. There isn't an upper bound
   // for the last bucket, so the length of counts_ will generally be one greater
@@ -397,93 +352,27 @@ class DynamicHistogram {
   std::vector<double> ubounds_;
   std::vector<double> counts_;
   std::vector<uint64_t> bucket_generation_;
-  std::vector<double> insert_queue_;
   std::vector<double> quantiles_;
   std::vector<double> quantile_locations_;
   std::vector<double> decay_factors_;
 
-  template <bool threadsafe>
-  int insert_queue_count() const;
-
-  template <>
-  int insert_queue_count</*threadsafe=*/true>() const {
-    int size = insert_queue_end_ - insert_queue_begin_;
-    if (size < 0) {
-      size += insert_queue_.size();
+  void flush(FlushIterator<double>* flush_it) {
+    for (; *flush_it != insertion_buffer_.end(); ++(*flush_it)) {
+      flushValue(**flush_it);
     }
-    return size;
-  }
-
-  template <>
-  int insert_queue_count</*threadsafe=*/false>() const {
-    return 0;
-  }
-
-  template <bool threadsafe>
-  void flush(int items);
-
-  template <>
-  void flush</*threadsafe=*/true>(int items) {
-    const int size = insert_queue_.size();
-    int qx = insert_queue_begin_;
-    for (int i = 0; i < items; i++) {
-      // Use the unlocked version of addValueImpl now that we're under a lock.
-      addValueImpl</*threadsafe=*/false>(insert_queue_[qx]);
-      qx++;
-      if (qx == size) {
-        qx = 0;
-      }
-    }
-    insert_queue_begin_ = qx;
     refresh();
   }
 
-  template <>
-  void flush</*threadsafe=*/false>(int items) {
-    refresh();
-  }
-
-  template <bool threadsafe>
-  void addValueImpl(double val);
-
-  template <>
-  void addValueImpl</*threadsafe=*/true>(double val) {
-    std::scoped_lock insert_lock(insert_mu_);
-
-    while (kThreadsafe &&
-           (2 * insert_queue_to_flush_ >= insert_queue_.size())) {
-      int items = insert_queue_to_flush_;
-      insert_queue_to_flush_ = 0;
-
-      insert_mu_.unlock();
-      {
-        std::scoped_lock flush_lock(flush_mu_);
-        flush</*threadsafe=*/true>(items);
-      }
-      insert_mu_.lock();
-    }
-
-    insert_queue_[insert_queue_end_] = val;
-    insert_queue_end_++;
-    insert_queue_to_flush_++;
-
-    if (insert_queue_end_ == insert_queue_.size()) {
-      insert_queue_end_ = 0;
-    }
-  }
-
-  template <>
-  void addValueImpl</*threadsafe=*/false>(double val) {
+  void flushValue(double val) {
     generation_++;
 
-    // decay();
     // shift_quantiles will treat the new value as a point with mass 1 which
     // only makes sense after the decay and before the point has been
     // integrated into the histogram.
     // shift_quantiles(val);
     int bx = insertValue(val);
 
-    if (kUseDecay) {
+    if (decay_rate_ != 0.0) {
       total_count_ = total_count_ * (1.0 - decay_rate_) + 1.0;
     } else {
       total_count_ = generation_;
@@ -498,7 +387,7 @@ class DynamicHistogram {
     }
 
     refresh();
-    if (kUseDecay) {
+    if (decay_rate_ != 0.0) {
       for (int i = 0; i < bucket_generation_.size(); i++) {
         assert(bucket_generation_[i] == generation_);
       }
@@ -508,20 +397,10 @@ class DynamicHistogram {
     merge();
   }
 
-  int reserve_flush_items() {
-    // TODO(lpe): Could this just use an atomic for insert_queue_to_flush_?
-    // TODO(lpe): It doesn't look like thie lock is disabled when
-    //   kThreadsafe == false. What's up with that?
-    std::scoped_lock l(insert_mu_);
-    int to_flush = insert_queue_to_flush_;
-    insert_queue_to_flush_ = 0;
-    return to_flush;
-  }
-
   double splitThreshold() { return 2 * total_count_ / getNumBuckets(); }
 
   double countAfterDecay(double original, uint64_t generations) {
-    if (!kUseDecay) {
+    if (decay_rate_ == 0.0) {
       return original;
     }
     // This invariant should be maintained by addValue calling refresh()
@@ -531,7 +410,7 @@ class DynamicHistogram {
   }
 
   void decay(int bx) {
-    if (!kUseDecay) {
+    if (decay_rate_ == 0.0) {
       return;
     }
     counts_[bx] =

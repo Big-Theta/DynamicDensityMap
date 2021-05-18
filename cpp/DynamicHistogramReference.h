@@ -43,28 +43,6 @@ public:
     merge();
   }
 
-  void addRepeatedValue(double val, uint64_t nValues) {
-    for (int i = 0; i < nValues; i++) {
-      addValue(val);
-    }
-  }
-
-  void clear() {
-    generation_ = 0;
-    ubounds_.clear();
-    ubounds_.resize(max_num_buckets_ - 1);
-    counts_.clear();
-    counts_.resize(max_num_buckets_);
-    quantiles_.clear();
-    quantile_locations_.clear();
-  }
-
-  // TODO(lpe)
-  void merge(const DynamicHistogramReference &other) { assert(false); }
-
-  // TODO(lpe)
-  void copy(const DynamicHistogramReference &other) { assert(false); }
-
   size_t getNumBuckets() { return counts_.size(); }
 
   Bucket getBucketByIndex(size_t idx) const {

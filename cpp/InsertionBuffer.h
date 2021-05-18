@@ -22,23 +22,20 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cassert>
-#include <cmath>
+#include <atomic>
+#include <cstddef>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <vector>
 
 namespace dhist {
 
-template <typename T, bool kThreadsafe>
+template <typename T>
 class InsertionBuffer;
 
-template <typename T, bool kThreadsafe>
+template <typename T>
 struct FlushIterator {
   using iterator_category = std::forward_iterator_tag;
   using difference_type = std::ptrdiff_t;
@@ -46,23 +43,23 @@ struct FlushIterator {
   using pointer = value_type*;
   using reference = value_type&;
 
-  FlushIterator(InsertionBuffer<T, kThreadsafe>* insertion_buffer)
-      : ibuf_(insertion_buffer) {
-    printf("> FlushIterator(): %zu, %zu\n", ibuf_->insert_buffer_begin_,
-           ibuf_->insert_buffer_end_);
-
+  FlushIterator(InsertionBuffer<T>* insertion_buffer)
+      : ibuf_(insertion_buffer), processed_(0) {
     ibuf_->flush_mu_.lock();
-
-    idx_ = ibuf_->insert_buffer_begin_;
-    ptr_ = &ibuf_->insert_buffer_[idx_];
+    idx_ = ibuf_->buffer_begin_;
+    ptr_ = &ibuf_->buffer_[idx_];
   }
 
   FlushIterator(pointer ptr) : ibuf_(nullptr), ptr_(ptr) {}
 
+  FlushIterator(const FlushIterator&) = delete;
+
   ~FlushIterator() {
     if (ibuf_) {
-      ibuf_->insert_buffer_begin_ = idx_;
+      ibuf_->buffer_begin_ = idx_;
 
+      std::scoped_lock(ibuf_->insert_mu_);
+      ibuf_->unflushed_ -= processed_;
       ibuf_->flush_mu_.unlock();
     }
   }
@@ -72,19 +69,13 @@ struct FlushIterator {
 
   // Prefix increment
   FlushIterator& operator++() {
+    processed_++;
     idx_++;
-    if (idx_ >= ibuf_->insert_buffer_.size()) {
+    if (idx_ >= ibuf_->buffer_.size()) {
       idx_ = 0;
     }
-    ptr_ = &ibuf_->insert_buffer_[idx_];
+    ptr_ = &ibuf_->buffer_[idx_];
     return *this;
-  }
-
-  // Postfix increment
-  FlushIterator operator++(int) {
-    FlushIterator tmp = *this;
-    ++(*this);
-    return tmp;
   }
 
   friend bool operator==(const FlushIterator& a, const FlushIterator& b) {
@@ -96,56 +87,57 @@ struct FlushIterator {
   };
 
  private:
-  InsertionBuffer<T, kThreadsafe>* ibuf_;
+  InsertionBuffer<T>* ibuf_;
   size_t idx_;
+  size_t processed_;
   pointer ptr_;
 };
 
-template <typename T, bool kThreadsafe = true>
+template <typename T>
 class InsertionBuffer {
  public:
-  friend struct FlushIterator<T, kThreadsafe>;
+  friend struct FlushIterator<T>;
 
   InsertionBuffer(size_t buffer_size = 512)
-      : generation_(0),
-        refresh_generation_(0),
-        insert_buffer_begin_(0),
-        insert_buffer_end_(0) {
-    insert_buffer_.resize(buffer_size);
+      : buffer_begin_(0), buffer_end_(0), unflushed_(0) {
+    buffer_.resize(buffer_size);
   }
 
-  void addValue(T val) {
-    std::unique_ptr<std::scoped_lock<std::mutex>> lp;
-    if (kThreadsafe) {
-      lp.reset(new std::scoped_lock(flush_mu_));
-    }
+  size_t addValue(T val) {
+    std::scoped_lock l(insert_mu_);
 
-    insert_buffer_[insert_buffer_end_] = val;
-    if (insert_buffer_end_ + 1 == insert_buffer_.size()) {
-      insert_buffer_end_ = 0;
-    } else {
-      insert_buffer_end_++;
+    buffer_[buffer_end_] = val;
+    size_t end = 1 + buffer_end_;
+    if (end == buffer_.size()) {
+      end = 0;
     }
+    buffer_end_ = end;
+
+    unflushed_++;
+    return unflushed_;
   }
 
-  FlushIterator<T, kThreadsafe> begin() {
+  size_t capacity() const {
+    return buffer_.size();
+  }
+
+  FlushIterator<T> lockedIterator() {
     return FlushIterator(this);
   }
 
-  FlushIterator<T, kThreadsafe> end() {
-    return FlushIterator<T, kThreadsafe>(&insert_buffer_[insert_buffer_end_]);
+  FlushIterator<T> end() {
+    return FlushIterator(&buffer_[buffer_end_]);
   }
 
  protected:
+  std::mutex insert_mu_;
   std::mutex flush_mu_;
 
  private:
-  std::mutex insert_mu_;
-  uint64_t generation_;
-  uint64_t refresh_generation_;
-  size_t insert_buffer_begin_;
-  size_t insert_buffer_end_;
-  std::vector<T> insert_buffer_;
+  size_t buffer_begin_;
+  size_t buffer_end_;
+  size_t unflushed_;
+  std::vector<T> buffer_;
 };
 
 }  // namespace dhist

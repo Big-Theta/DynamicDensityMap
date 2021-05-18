@@ -6,6 +6,7 @@
 #include "DynamicHistogramReference.h"
 #include "benchmark/benchmark.h"
 
+
 static void BM_ReferenceAdd(benchmark::State &state) {
   std::vector<double> vals;
   std::default_random_engine gen;
@@ -35,7 +36,7 @@ static void BM_ReferenceAdd(benchmark::State &state) {
 }
 BENCHMARK(BM_ReferenceAdd)->Arg(0)->Arg(1);
 
-template <class T> void BM_AddDecay(benchmark::State &state) {
+static void BM_AddDecay(benchmark::State &state) {
   std::vector<double> vals;
   std::default_random_engine gen;
   std::uniform_real_distribution<double> unif(0.0, 1.0);
@@ -46,7 +47,7 @@ template <class T> void BM_AddDecay(benchmark::State &state) {
 
   double decay_rate = 0.0001;
 
-  T uut(/*max_num_buckets=*/31, /*decay_rate=*/decay_rate);
+  dhist::DynamicHistogram uut(/*max_num_buckets=*/31, /*decay_rate=*/decay_rate);
 
   int i = 0;
   int size = vals.size();
@@ -59,12 +60,9 @@ template <class T> void BM_AddDecay(benchmark::State &state) {
     uut.addValue(vals[i]);
   }
 }
-BENCHMARK_TEMPLATE(BM_AddDecay, dhist::DynamicHistogram</*kUseDecay=*/true,
-                                                        /*kThreadsafe=*/true>);
-BENCHMARK_TEMPLATE(BM_AddDecay, dhist::DynamicHistogram</*kUseDecay=*/true,
-                                                        /*kThreadsafe=*/false>);
+BENCHMARK(BM_AddDecay);
 
-template <class T> void BM_AddNoDecay(benchmark::State &state) {
+void BM_AddNoDecay(benchmark::State &state) {
   std::vector<double> vals;
   std::default_random_engine gen;
   std::uniform_real_distribution<double> unif(0.0, 1.0);
@@ -75,7 +73,7 @@ template <class T> void BM_AddNoDecay(benchmark::State &state) {
 
   double decay_rate = 0.0;
 
-  T uut(/*max_num_buckets=*/31, /*decay_rate=*/decay_rate);
+  dhist::DynamicHistogram uut(/*max_num_buckets=*/31, /*decay_rate=*/decay_rate);
 
   int i = 0;
   int size = vals.size();
@@ -88,11 +86,6 @@ template <class T> void BM_AddNoDecay(benchmark::State &state) {
     uut.addValue(vals[i]);
   }
 }
-BENCHMARK_TEMPLATE(BM_AddNoDecay,
-                   dhist::DynamicHistogram</*kUseDecay=*/false,
-                                           /*kThreadsafe=*/true>);
-BENCHMARK_TEMPLATE(BM_AddNoDecay,
-                   dhist::DynamicHistogram</*kUseDecay=*/false,
-                                           /*kThreadsafe=*/false>);
+BENCHMARK(BM_AddNoDecay);
 
 BENCHMARK_MAIN();

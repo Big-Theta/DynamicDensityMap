@@ -171,7 +171,7 @@ TEST(ReferenceTest, quantilesTracking) {
 TEST(DynamicHistogramTest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
-  DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/false> uut(
+  DynamicHistogram uut(
       /*max_num_buckets=*/31,
       /*decay_rate=*/kDecayRate);
   std::default_random_engine gen;
@@ -192,7 +192,7 @@ TEST(DynamicHistogramTest, addNoDecay) {
 TEST(DynamicHistogramTest, addWithDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.00001;
-  DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/false> uut(
+  DynamicHistogram uut(
       /*max_num_buckets=*/31,
       /*decay_rate=*/kDecayRate);
   std::default_random_engine gen;
@@ -223,8 +223,7 @@ TEST(DynamicHistogramTest, multithreadedStress) {
   static const int kNumThreads = 8;
   std::thread threads[kNumThreads];
 
-  DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/true> uut(
-      /*max_num_buckets=*/31, /*decay_rate=*/0.00001);
+  DynamicHistogram uut(/*max_num_buckets=*/31, /*decay_rate=*/0.00001);
 
   for (int tx = 0; tx < kNumThreads; tx++) {
     threads[tx] = std::thread(
@@ -255,8 +254,7 @@ TEST(DynamicHistogramTest, multithreadedStress) {
 }
 
 TEST(DynamicHistogramTest, getMean) {
-  DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/true> uut(
-      /*max_num_buckets=*/61);
+  DynamicHistogram uut(/*max_num_buckets=*/61);
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 
@@ -269,8 +267,7 @@ TEST(DynamicHistogramTest, getMean) {
 }
 
 TEST(DynamicHistogramTest, toProto) {
-  DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/true> uut(
-      /*max_num_buckets=*/61);
+  DynamicHistogram uut(/*max_num_buckets=*/61);
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 
@@ -312,13 +309,10 @@ TYPED_TEST(DynamicHistogramTypedTest, referenceEquivalence) {
   static constexpr int kMaxNumBuckets = 31;
   static constexpr int kNumValues = 10000;
 
-  TypeParam kThreadsafe;
-
   DynamicHistogramReference ref(
       /*max_num_buckets=*/kMaxNumBuckets,
       /*decay_rate=*/kDecayRate);
-  DynamicHistogram</*kUseDecay=*/true, /*kThreadsafe=*/kThreadsafe.val> dyn(
-      /*max_num_buckets=*/kMaxNumBuckets,
+  DynamicHistogram dyn(/*max_num_buckets=*/kMaxNumBuckets,
       /*decay_rate=*/kDecayRate);
 
   std::default_random_engine gen;
