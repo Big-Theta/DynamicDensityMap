@@ -20,8 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef DYNAMIC_HISTOGRAM_H
-#define DYNAMIC_HISTOGRAM_H
+#pragma once
 
 #include <google/protobuf/util/time_util.h>
 
@@ -459,7 +458,7 @@ class DynamicHistogram {
       insert_mu_.unlock();
       {
         std::scoped_lock flush_lock(flush_mu_);
-        flush</*kThreadsafe=*/true>(items);
+        flush</*threadsafe=*/true>(items);
       }
       insert_mu_.lock();
     }
@@ -698,5 +697,3 @@ class DynamicHistogram {
 };
 
 }  // namespace dhist
-
-#endif  // DYNAMIC_HISTOGRAM_H

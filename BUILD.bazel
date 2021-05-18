@@ -80,3 +80,21 @@ py_binary(
         ":density_map_py_proto",
     ],
 )
+
+cc_library(
+    name = "insertion_buffer",
+    srcs = ["cpp/InsertionBuffer.h"],
+)
+
+cc_test(
+    name = "insertion_buffer_test",
+    srcs = ["cpp/InsertionBufferTest.cpp"],
+    deps = [
+        ":insertion_buffer",
+        "@gtest//:gtest",
+        "@gtest//:gtest_main"
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+)
