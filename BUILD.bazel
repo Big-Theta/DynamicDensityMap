@@ -39,6 +39,34 @@ cc_test(
     ],
 )
 
+cc_library(
+    name = "dynamic_kde",
+    hdrs = ["cpp/DynamicKDE.h"],
+    deps = [
+        ":density_map_cc_proto",
+        ":timestamp_cc_proto",
+        ":insertion_buffer",
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "dynamic_kde_test",
+    srcs = ["cpp/DynamicKDETest.cpp"],
+    deps = [
+        ":density_map_cc_proto",
+        ":dynamic_kde",
+        "@gtest//:gtest",
+        "@gtest//:gtest_main"
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+)
+
 cc_binary(
     name = "dynamic_histogram_benchmark",
     srcs = ["cpp/DynamicHistogramBenchmark.cpp"],

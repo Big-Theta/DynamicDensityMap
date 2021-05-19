@@ -36,7 +36,7 @@ static void BM_ReferenceAdd(benchmark::State &state) {
 }
 BENCHMARK(BM_ReferenceAdd)->Arg(0)->Arg(1);
 
-static void BM_AddDecay(benchmark::State &state) {
+static void BM_DHistAddDecay(benchmark::State &state) {
   std::vector<double> vals;
   std::default_random_engine gen;
   std::uniform_real_distribution<double> unif(0.0, 1.0);
@@ -60,9 +60,9 @@ static void BM_AddDecay(benchmark::State &state) {
     uut.addValue(vals[i]);
   }
 }
-BENCHMARK(BM_AddDecay);
+BENCHMARK(BM_DHistAddDecay);
 
-void BM_AddNoDecay(benchmark::State &state) {
+void BM_DHistAddNoDecay(benchmark::State &state) {
   std::vector<double> vals;
   std::default_random_engine gen;
   std::uniform_real_distribution<double> unif(0.0, 1.0);
@@ -86,6 +86,6 @@ void BM_AddNoDecay(benchmark::State &state) {
     uut.addValue(vals[i]);
   }
 }
-BENCHMARK(BM_AddNoDecay);
+BENCHMARK(BM_DHistAddNoDecay);
 
 BENCHMARK_MAIN();

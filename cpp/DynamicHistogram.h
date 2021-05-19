@@ -26,12 +26,9 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <map>
-#include <memory>
-#include <mutex>
 #include <vector>
 
 #include "DensityMap.pb.h"
@@ -68,19 +65,18 @@ class Bucket {
 
 class DynamicHistogram {
  public:
-  DynamicHistogram(size_t max_num_buckets, double decay_rate = 0.0,
+  DynamicHistogram(size_t num_buckets, double decay_rate = 0.0,
                    int refresh_interval = 512)
-      : max_num_buckets_(max_num_buckets),
-        decay_rate_(decay_rate),
+      : decay_rate_(decay_rate),
         refresh_interval_(refresh_interval),
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
         insertion_buffer_(/*buffer_size=*/2 * refresh_interval) {
-    ubounds_.resize(max_num_buckets_);
+    ubounds_.resize(num_buckets);
     ubounds_.back() = std::numeric_limits<double>::max();
-    counts_.resize(max_num_buckets_);
-    bucket_generation_.resize(max_num_buckets_);
+    counts_.resize(num_buckets);
+    bucket_generation_.resize(num_buckets);
 
     if (decay_rate_ != 0.0) {
       decay_factors_.resize(refresh_interval_);
@@ -336,7 +332,6 @@ class DynamicHistogram {
   }
 
  protected:
-  const size_t max_num_buckets_;
   const double decay_rate_;
   const int refresh_interval_;
 
