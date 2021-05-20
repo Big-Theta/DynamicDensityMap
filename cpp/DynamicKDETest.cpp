@@ -37,6 +37,7 @@ TEST(KernelTest, addValue) {
 
   EXPECT_EQ(k.mean(), 4.0);
   EXPECT_EQ(k.variance(), 5.0);
+  EXPECT_EQ(k.count(), 4.0);
 }
 
 TEST(KernelTest, decay) {
@@ -45,10 +46,23 @@ TEST(KernelTest, decay) {
   k.addValue(3.0, 1.0);
   k.addValue(5.0, 1.0);
   k.addValue(7.0, 1.0);
-  k.decay(0.9);
+  k.decay(0.9, 5);
 
   EXPECT_EQ(k.mean(), 4.0);
   EXPECT_EQ(k.variance(), 5.0);
+  EXPECT_EQ(k.count(), 3.6);
+}
+
+TEST(KernelTest, weightedAddValue) {
+  Kernel k;
+  k.addValue(1.0, 0.5);
+  k.addValue(3.0, 0.5);
+  k.addValue(5.0, 0.5);
+  k.addValue(7.0, 0.5);
+
+  EXPECT_EQ(k.mean(), 4.0);
+  EXPECT_EQ(k.variance(), 5.0);
+  EXPECT_EQ(k.count(), 2.0);
 }
 
 TEST(DynamicKDETest, addNoDecay) {
@@ -58,14 +72,21 @@ TEST(DynamicKDETest, addNoDecay) {
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
+  setbuf(stdout, 0);
+  printf("here\n");
+
   for (int i = 0; i < kNumValues; i++) {
+    printf("here %d\n", i);
     uut.addValue(norm(gen));
   }
+  printf("there\n%s\n");
 
   EXPECT_EQ(uut.computeTotalCount(), kNumValues);
+  printf("there 2\n");
   EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1);
+  printf("there 3\n");
   EXPECT_NEAR(uut.getQuantileEstimate(0.05), -1.644854, 1e-1);
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
 
-  EXPECT_NEAR(uut.getMean(), 0.0, 1e-1);
+  EXPECT_NEAR(uut.getMean(), 0.0, 1e-1) << uut.debugString();
 }

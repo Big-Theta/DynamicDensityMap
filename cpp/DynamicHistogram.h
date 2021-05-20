@@ -98,7 +98,7 @@ class DynamicHistogram {
     }
   }
 
-  size_t getNumBuckets() { return counts_.size(); }
+  size_t getNumBuckets() const { return counts_.size(); }
 
   Bucket getBucketByIndex(size_t bx) {
     double min;
@@ -392,7 +392,7 @@ class DynamicHistogram {
     merge();
   }
 
-  double splitThreshold() { return 2 * total_count_ / getNumBuckets(); }
+  double splitThreshold() const { return 2 * total_count_ / getNumBuckets(); }
 
   double countAfterDecay(double original, uint64_t generations) {
     if (decay_rate_ == 0.0) {
