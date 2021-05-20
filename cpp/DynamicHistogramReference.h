@@ -33,13 +33,13 @@ public:
     // only makes sense after the decay and before the point has been
     // integrated into the histogram.
     shift_quantiles(val);
-    int bucket_idx = insertValue(val);
+    size_t bx = insertValue(val);
 
-    if (counts_[bucket_idx] < splitThreshold()) {
+    if (counts_[bx] < splitThreshold()) {
       return;
     }
 
-    split(bucket_idx);
+    split(bx);
     merge();
   }
 
@@ -64,10 +64,10 @@ public:
   }
 
   int getBucketIndexByValue(double val) const {
-    int bucket_idx = 0;
-    for (; bucket_idx < ubounds_.size(); bucket_idx++) {
-      if (val < ubounds_[bucket_idx]) {
-        return bucket_idx;
+    size_t bx = 0;
+    for (; bx < ubounds_.size(); bx++) {
+      if (val < ubounds_[bx]) {
+        return bx;
       }
     }
     return ubounds_.size();
@@ -82,7 +82,7 @@ public:
   }
 
   double getMax() const {
-    const int idx = ubounds_.size() - 1;
+    const size_t idx = ubounds_.size() - 1;
     if (counts_[idx] == 0.0) {
       return ubounds_.back();
     }
@@ -100,7 +100,7 @@ public:
 
   double getMean() {
     double acc = counts_[0] * (ubounds_[0] + getMin()) / 2.0;
-    int i = 1;
+    size_t i = 1;
     for (; i < counts_.size() - 1; i++) {
       acc += counts_[i] * (ubounds_[i] + ubounds_[i - 1]) / 2.0;
     }
@@ -117,11 +117,11 @@ public:
 
     double cdf = 0.0;
     double next_cdf = 0.0;
-    int bucket_idx = 0;
-    for (int i = 0; i < counts_.size(); i++) {
+    size_t bx = 0;
+    for (size_t i = 0; i < counts_.size(); i++) {
       next_cdf = cdf + counts_[i] / total_count;
       if (next_cdf > quantile) {
-        bucket_idx = i;
+        bx = i;
         break;
       }
       cdf = next_cdf;
@@ -130,15 +130,15 @@ public:
     double frac = (quantile - cdf) / (next_cdf - cdf);
 
     double lower_bound;
-    if (bucket_idx == 0) {
+    if (bx == 0) {
       lower_bound = getMin();
     } else {
-      lower_bound = ubounds_[bucket_idx - 1];
+      lower_bound = ubounds_[bx - 1];
     }
 
     double upper_bound;
-    if (bucket_idx < ubounds_.size()) {
-      upper_bound = ubounds_[bucket_idx];
+    if (bx < ubounds_.size()) {
+      upper_bound = ubounds_[bx];
     } else {
       upper_bound = getMax();
     }
@@ -149,7 +149,7 @@ public:
   void trackQuantiles(const std::vector<double> &quantiles) {
     std::copy(quantiles.begin(), quantiles.end(), back_inserter(quantiles_));
     quantile_locations_.clear();
-    for (int i = 0; i < quantiles_.size(); i++) {
+    for (size_t i = 0; i < quantiles_.size(); i++) {
       quantile_locations_.push_back(getQuantileEstimate(quantiles_[i]));
     }
   }
@@ -171,7 +171,7 @@ public:
       return false;
     }
 
-    for (int i = 0; i < ubounds_.size() - 1; i++) {
+    for (size_t i = 0; i < ubounds_.size() - 1; i++) {
       if (ubounds_[i] > ubounds_[i + 1]) {
         return false;
       }
@@ -210,13 +210,13 @@ public:
 
     cursor += snprintf(&s[cursor], s.size() - cursor, "  %d [%lf, %lf): %lf\n",
                        0, getMin(), ubounds_[1], counts_[0]);
-    int i;
+    size_t i;
     for (i = 0; i < ubounds_.size() - 1; i++) {
       cursor +=
-          snprintf(&s[cursor], s.size() - cursor, "  %d [%lf, %lf): %lf\n",
+          snprintf(&s[cursor], s.size() - cursor, "  %zu [%lf, %lf): %lf\n",
                    i + 1, ubounds_[i], ubounds_[i + 1], counts_[i + 1]);
     }
-    cursor += snprintf(&s[cursor], s.size() - cursor, "  %d [%lf, %lf): %lf\n",
+    cursor += snprintf(&s[cursor], s.size() - cursor, "  %zu [%lf, %lf): %lf\n",
                        i + 1, ubounds_.back(), getMax(), counts_[i + 1]);
     s.resize(cursor);
 
@@ -235,7 +235,7 @@ public:
     cursor += snprintf(&s[cursor], s.size() - cursor, "%lf],\n  \"counts\": [",
                        getMax());
 
-    for (int i = 0; i < counts_.size() - 1; i++) {
+    for (size_t i = 0; i < counts_.size() - 1; i++) {
       cursor += snprintf(&s[cursor], s.size() - cursor, "%lf, ", counts_[i]);
     }
     cursor +=
@@ -264,7 +264,7 @@ protected:
   }
 
   void decay() {
-    for (int i = 0; i < counts_.size(); i++) {
+    for (size_t i = 0; i < counts_.size(); i++) {
       counts_[i] = counts_[i] * (1.0 - decay_rate_);
     }
   }
@@ -272,63 +272,63 @@ protected:
   // Adjust bounds and add.
   // Returns:
   //   The index of the bucket that the new value landed in.
-  int insertValue(double val) {
-    int bucket_idx = getBucketIndexByValue(val);
-    if (bucket_idx > 0) {
-      double count_with_below = counts_[bucket_idx - 1] + counts_[bucket_idx];
-      ubounds_[bucket_idx - 1] =
-          (count_with_below * ubounds_[bucket_idx - 1] + val) /
+  size_t insertValue(double val) {
+    size_t bx = getBucketIndexByValue(val);
+    if (bx > 0) {
+      double count_with_below = counts_[bx - 1] + counts_[bx];
+      ubounds_[bx - 1] =
+          (count_with_below * ubounds_[bx - 1] + val) /
           (count_with_below + 1.0);
     }
 
-    if (bucket_idx < ubounds_.size()) {
-      double count_with_above = counts_[bucket_idx] + counts_[bucket_idx + 1];
-      ubounds_[bucket_idx] = (count_with_above * ubounds_[bucket_idx] + val) /
+    if (bx < ubounds_.size()) {
+      double count_with_above = counts_[bx] + counts_[bx + 1];
+      ubounds_[bx] = (count_with_above * ubounds_[bx] + val) /
                              (count_with_above + 1.0);
     }
 
     // Add value
-    counts_[bucket_idx] += 1.0;
+    counts_[bx] += 1.0;
 
-    return bucket_idx;
+    return bx;
   }
 
-  void split(int bucket_idx) {
+  void split(size_t bx) {
     double lower_bound;
-    if (bucket_idx == 0) {
+    if (bx == 0) {
       lower_bound = getMin();
     } else {
-      lower_bound = ubounds_[bucket_idx - 1];
+      lower_bound = ubounds_[bx - 1];
     }
 
-    if (bucket_idx == ubounds_.size()) {
+    if (bx == ubounds_.size()) {
       double upper_bound = getMax();
       ubounds_.push_back((lower_bound + upper_bound) / 2.0);
-      counts_[bucket_idx] /= 2.0;
+      counts_[bx] /= 2.0;
       counts_.push_back(counts_.back());
     } else {
-      double upper_bound = ubounds_[bucket_idx];
+      double upper_bound = ubounds_[bx];
 
       ubounds_.push_back(0.0);
-      for (int i = ubounds_.size() - 1; i > bucket_idx; i--) {
+      for (size_t i = ubounds_.size() - 1; i > bx; i--) {
         ubounds_[i] = ubounds_[i - 1];
       }
 
-      ubounds_[bucket_idx] = (lower_bound + upper_bound) / 2.0;
+      ubounds_[bx] = (lower_bound + upper_bound) / 2.0;
 
       counts_.push_back(0.0);
-      for (int i = counts_.size() - 1; i > bucket_idx; i--) {
+      for (size_t i = counts_.size() - 1; i > bx; i--) {
         counts_[i] = counts_[i - 1];
       }
-      counts_[bucket_idx] /= 2.0;
-      counts_[bucket_idx + 1] = counts_[bucket_idx];
+      counts_[bx] /= 2.0;
+      counts_[bx + 1] = counts_[bx];
     }
   }
 
   void merge() {
     int merge_idx = 0;
     double merged_count = counts_[0] + counts_[1];
-    for (int i = 1; i < counts_.size() - 1; i++) {
+    for (size_t i = 1; i < counts_.size() - 1; i++) {
       double pos_count = counts_[i] + counts_[i + 1];
       if (pos_count < merged_count) {
         merge_idx = i;
@@ -336,28 +336,28 @@ protected:
       }
     }
 
-    for (int i = merge_idx; i < ubounds_.size() - 1; i++) {
+    for (size_t i = merge_idx; i < ubounds_.size() - 1; i++) {
       ubounds_[i] = ubounds_[i + 1];
     }
     ubounds_.pop_back();
 
     counts_[merge_idx] = merged_count;
-    for (int i = merge_idx + 1; i < counts_.size() - 1; i++) {
+    for (size_t i = merge_idx + 1; i < counts_.size() - 1; i++) {
       counts_[i] = counts_[i + 1];
     }
     counts_.pop_back();
   }
 
   void shift_quantiles(double val) {
-    for (int idx = 0; idx < quantiles_.size(); idx++) {
+    for (size_t idx = 0; idx < quantiles_.size(); idx++) {
       double shift_remaining = quantiles_[idx];
       double location = quantile_locations_[idx];
       if (val < location) {
         shift_remaining = -shift_remaining;
       }
 
-      int bucket_idx = getBucketIndexByValue(location);
-      Bucket bucket = getBucketByIndex(bucket_idx);
+      size_t bx = getBucketIndexByValue(location);
+      Bucket bucket = getBucketByIndex(bx);
       do {
         double target_location = val;
         if (bucket.count() != 0.0) {
@@ -375,22 +375,22 @@ protected:
           break;
         }
 
-        if (bucket_idx > 0 &&
+        if (bx > 0 &&
             in_range(bucket.min(), location, target_location)) {
           // Shift to the lower bucket.
           shift_remaining = shift_remaining * (location - bucket.min()) /
                             (location - target_location);
           location = bucket.min();
-          --bucket_idx;
-          bucket = getBucketByIndex(bucket_idx);
-        } else if (bucket_idx + 1 < ubounds_.size() &&
+          --bx;
+          bucket = getBucketByIndex(bx);
+        } else if (bx + 1 < ubounds_.size() &&
                    in_range(bucket.max(), location, target_location)) {
           // Shift to the upper bucket.
           shift_remaining = shift_remaining * (bucket.max() - location) /
                             (target_location - location);
           location = bucket.max();
-          ++bucket_idx;
-          bucket = getBucketByIndex(bucket_idx);
+          ++bx;
+          bucket = getBucketByIndex(bx);
         } else {
           quantile_locations_[idx] = target_location;
           shift_remaining = 0.0;

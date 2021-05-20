@@ -66,7 +66,7 @@ class Bucket {
 class DynamicHistogram {
  public:
   DynamicHistogram(size_t num_buckets, double decay_rate = 0.0,
-                   int refresh_interval = 512)
+                   size_t refresh_interval = 512)
       : decay_rate_(decay_rate),
         refresh_interval_(refresh_interval),
         generation_(0),
@@ -81,7 +81,7 @@ class DynamicHistogram {
     if (decay_rate_ != 0.0) {
       decay_factors_.resize(refresh_interval_);
       double decay = 1.0;
-      for (int i = 0; i < refresh_interval_; i++) {
+      for (size_t i = 0; i < refresh_interval_; i++) {
         decay_factors_[i] = decay;
         decay *= 1.0 - decay_rate_;
       }
@@ -132,7 +132,7 @@ class DynamicHistogram {
   }
 
   double getMax() const {
-    const int bx = ubounds_.size() - 2;
+    const size_t bx = ubounds_.size() - 2;
     assert(bucket_generation_[bx] == bucket_generation_[bx - 1]);
     if (counts_[bx] == 0.0) {
       // The last ubounds_ value is a fake value that allows std::upper_bound
@@ -147,7 +147,7 @@ class DynamicHistogram {
     if (i == -1) {
       return getMin();
     }
-    if (i == ubounds_.size()) {
+    if (static_cast<size_t>(i) == ubounds_.size()) {
       return getMax();
     }
     return ubounds_[i];
@@ -166,7 +166,7 @@ class DynamicHistogram {
     double mean = 0.0;
     mean += counts_[0] * (getMin() + ubounds_[0]) / 2 / total_count_;
 
-    int i = 1;
+    size_t i = 1;
     for (; i < counts_.size() - 1; i++) {
       const double new_val = (ubounds_[i - 1] + ubounds_[i]) / 2;
       mean += counts_[i] * new_val / total_count_;
@@ -187,8 +187,8 @@ class DynamicHistogram {
 
     double cdf = 0.0;
     double next_cdf = 0.0;
-    int bx = 0;
-    for (int i = 0; i < counts_.size(); i++) {
+    size_t bx = 0;
+    for (size_t i = 0; i < counts_.size(); i++) {
       next_cdf = cdf + counts_[i] / total_count_;
       if (next_cdf > quantile) {
         bx = i;
@@ -229,12 +229,12 @@ class DynamicHistogram {
     }
 
     double count = 0.0;
-    for (int i = 0; i < counts_.size(); i++) {
+    for (size_t i = 0; i < counts_.size(); i++) {
       if (ubounds_[i] >= value) {
         count += counts_[i];
       } else {
         count += (getUpperBound(i) - value) /
-                 (getUpperBound(i) - getUpperBound(i - 1));
+                 (getUpperBound(i) - getUpperBound(static_cast<int>(i) - 1));
         break;
       }
     }
@@ -260,7 +260,7 @@ class DynamicHistogram {
     s += "  " + std::to_string(0) + " [" + std::to_string(getMin()) + ", " +
          std::to_string(ubounds_[0]) + "): " + std::to_string(counts_[0]) +
          "\n";
-    int i = 1;
+    size_t i = 1;
     for (; i < counts_.size() - 1; i++) {
       s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
            ", " + std::to_string(ubounds_[i]) +
@@ -283,12 +283,12 @@ class DynamicHistogram {
       s += "  \"label\": \"" + label + "\",\n";
     }
     s += "  \"bounds\": [" + std::to_string(getMin()) + ", ";
-    for (int i = 0; i + 1 < ubounds_.size(); i++) {
+    for (size_t i = 0; i + 1 < ubounds_.size(); i++) {
       s += std::to_string(ubounds_[i]) + ", ";
     }
     s += std::to_string(getMax()) + "],\n  \"counts\": [";
 
-    int i = 0;
+    size_t i = 0;
     for (; i < counts_.size() - 1; i++) {
       s += std::to_string(counts_[i]) + ", ";
     }
@@ -319,12 +319,12 @@ class DynamicHistogram {
     flush(&flush_it);
 
     dhist->add_bounds(getMin());
-    for (int i = 0; i + 1 < ubounds_.size(); i++) {
+    for (size_t i = 0; i + 1 < ubounds_.size(); i++) {
       dhist->add_bounds(ubounds_[i]);
     }
     dhist->add_bounds(getMax());
 
-    for (int i = 0; i < counts_.size(); i++) {
+    for (size_t i = 0; i < counts_.size(); i++) {
       dhist->add_counts(counts_[i]);
     }
 
@@ -333,7 +333,7 @@ class DynamicHistogram {
 
  protected:
   const double decay_rate_;
-  const int refresh_interval_;
+  const size_t refresh_interval_;
 
   uint64_t generation_;
   uint64_t refresh_generation_;
@@ -365,7 +365,7 @@ class DynamicHistogram {
     // only makes sense after the decay and before the point has been
     // integrated into the histogram.
     // shift_quantiles(val);
-    int bx = insertValue(val);
+    size_t bx = insertValue(val);
 
     if (decay_rate_ != 0.0) {
       total_count_ = total_count_ * (1.0 - decay_rate_) + 1.0;
@@ -383,7 +383,7 @@ class DynamicHistogram {
 
     refresh();
     if (decay_rate_ != 0.0) {
-      for (int i = 0; i < bucket_generation_.size(); i++) {
+      for (size_t i = 0; i < bucket_generation_.size(); i++) {
         assert(bucket_generation_[i] == generation_);
       }
     }
@@ -404,7 +404,7 @@ class DynamicHistogram {
     return original * decay_factors_[generations];
   }
 
-  void decay(int bx) {
+  void decay(size_t bx) {
     if (decay_rate_ == 0.0) {
       return;
     }
@@ -419,7 +419,7 @@ class DynamicHistogram {
     }
 
     total_count_ = 0.0;
-    for (int bx = 0; bx < counts_.size(); bx++) {
+    for (size_t bx = 0; bx < counts_.size(); bx++) {
       decay(bx);
       total_count_ += counts_[bx];
     }
@@ -429,8 +429,8 @@ class DynamicHistogram {
   // Adjust bounds and add.
   // Returns:
   //   The index of the bucket that the new value landed in.
-  int insertValue(double val) {
-    int bx =
+  size_t insertValue(double val) {
+    size_t bx =
         std::distance(ubounds_.begin(),
                       std::upper_bound(ubounds_.begin(), ubounds_.end(), val));
 
@@ -456,7 +456,7 @@ class DynamicHistogram {
     return bx;
   }
 
-  void split(int bx) {
+  void split(size_t bx) {
     double lower_bound;
     if (bx == 0) {
       lower_bound = getMin();
@@ -474,14 +474,14 @@ class DynamicHistogram {
       double upper_bound = ubounds_[bx];
 
       ubounds_.push_back(0.0);
-      for (int i = ubounds_.size() - 1; i > bx; i--) {
+      for (size_t i = ubounds_.size() - 1; i > bx; i--) {
         ubounds_[i] = ubounds_[i - 1];
       }
 
       ubounds_[bx] = (lower_bound + upper_bound) / 2.0;
 
       counts_.push_back(0.0);
-      for (int i = counts_.size() - 1; i > bx; i--) {
+      for (size_t i = counts_.size() - 1; i > bx; i--) {
         counts_[i] = counts_[i - 1];
       }
       counts_[bx] /= 2.0;
@@ -492,7 +492,7 @@ class DynamicHistogram {
   void merge() {
     int merge_idx = 0;
     double merged_count = counts_[0] + counts_[1];
-    for (int i = 1; i < counts_.size() - 1; i++) {
+    for (size_t i = 1; i < counts_.size() - 1; i++) {
       double pos_count = counts_[i] + counts_[i + 1];
       if (pos_count < merged_count) {
         merge_idx = i;
@@ -500,27 +500,27 @@ class DynamicHistogram {
       }
     }
 
-    for (int i = merge_idx; i < ubounds_.size() - 1; i++) {
+    for (size_t i = merge_idx; i < ubounds_.size() - 1; i++) {
       ubounds_[i] = ubounds_[i + 1];
     }
     ubounds_.pop_back();
 
     counts_[merge_idx] = merged_count;
-    for (int i = merge_idx + 1; i < counts_.size() - 1; i++) {
+    for (size_t i = merge_idx + 1; i < counts_.size() - 1; i++) {
       counts_[i] = counts_[i + 1];
     }
     counts_.pop_back();
   }
 
   void shift_quantiles(double val) {
-    for (int idx = 0; idx < quantiles_.size(); idx++) {
+    for (size_t idx = 0; idx < quantiles_.size(); idx++) {
       double shift_remaining = quantiles_[idx];
       double location = quantile_locations_[idx];
       if (val < location) {
         shift_remaining = -shift_remaining;
       }
 
-      int bx = getBucketIndexByValue(location);
+      size_t bx = getBucketIndexByValue(location);
       Bucket bucket = getBucketByIndex(bx);
       do {
         double target_location = val;

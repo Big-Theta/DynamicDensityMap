@@ -152,7 +152,7 @@ class Kernel {
 class DynamicKDE {
  public:
   DynamicKDE(size_t num_kernels, double decay_rate = 0.0,
-             int refresh_interval = 512)
+             size_t refresh_interval = 512)
       : decay_rate_(decay_rate),
         refresh_interval_(refresh_interval),
         generation_(0),

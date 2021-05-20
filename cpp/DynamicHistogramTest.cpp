@@ -332,7 +332,7 @@ TYPED_TEST(DynamicHistogramTypedTest, referenceEquivalence) {
   }
 
   EXPECT_EQ(ref.getNumBuckets(), dyn.getNumBuckets());
-  for (int bx = 0; bx < ref.getNumBuckets(); bx++) {
+  for (size_t bx = 0; bx < ref.getNumBuckets(); bx++) {
     auto ref_bucket = ref.getBucketByIndex(bx);
     auto dyn_bucket = dyn.getBucketByIndex(bx);
     EXPECT_NEAR(ref_bucket.min(), dyn_bucket.min(), 1e-6);

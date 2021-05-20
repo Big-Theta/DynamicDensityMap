@@ -73,6 +73,7 @@ cc_binary(
     deps = [
         ":dynamic_histogram",
         ":dynamic_histogram_reference",
+        ":dynamic_kde",
         "@benchmark//:benchmark",
     ],
     copts = [
