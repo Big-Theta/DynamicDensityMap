@@ -165,7 +165,7 @@ class DynamicKDE {
     if (decay_rate_ != 0.0) {
       decay_factors_.resize(refresh_interval_);
       double decay = 1.0;
-      for (int i = 0; i < refresh_interval_; i++) {
+      for (size_t i = 0; i < refresh_interval_; i++) {
         decay_factors_[i] = decay;
         decay *= 1.0 - decay_rate_;
       }
@@ -277,7 +277,7 @@ class DynamicKDE {
   double splitThreshold() const { return 2 * total_count_ / getNumKernels(); }
 
   void flush(FlushIterator<double>* flush_it) {
-    for (; *flush_it != insertion_buffer_.end(); ++(*flush_it)) {
+    for (; *flush_it; ++(*flush_it)) {
       flushValue(**flush_it);
     }
     refresh();

@@ -26,7 +26,7 @@ TEST(InsertionBufferTest, flush) {
     EXPECT_EQ(uut.addValue(next_val++), i + 1);
   }
 
-  for (auto it = uut.lockedIterator(); it != uut.end(); ++it) {
+  for (auto it = uut.lockedIterator(); it; ++it) {
     total_flushed += *it;
   }
 
@@ -34,7 +34,7 @@ TEST(InsertionBufferTest, flush) {
     EXPECT_EQ(uut.addValue(next_val++), i + 1);
   }
 
-  for (auto it = uut.lockedIterator(); it != uut.end(); ++it) {
+  for (auto it = uut.lockedIterator(); it; ++it) {
     total_flushed += *it;
   }
 

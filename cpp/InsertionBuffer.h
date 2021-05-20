@@ -47,6 +47,7 @@ struct FlushIterator {
       : ibuf_(insertion_buffer), processed_(0) {
     ibuf_->flush_mu_.lock();
     idx_ = ibuf_->buffer_begin_;
+    end_idx_ = ibuf_->buffer_end_;
     ptr_ = &ibuf_->buffer_[idx_];
   }
 
@@ -66,6 +67,10 @@ struct FlushIterator {
 
   reference operator*() const { return *ptr_; }
   pointer operator->() { return ptr_; }
+
+  operator bool() const {
+    return idx_ != end_idx_;
+  }
 
   // Prefix increment
   FlushIterator& operator++() {
@@ -89,6 +94,7 @@ struct FlushIterator {
  private:
   InsertionBuffer<T>* ibuf_;
   size_t idx_;
+  size_t end_idx_;
   size_t processed_;
   pointer ptr_;
 };
@@ -123,10 +129,6 @@ class InsertionBuffer {
 
   FlushIterator<T> lockedIterator() {
     return FlushIterator(this);
-  }
-
-  FlushIterator<T> end() {
-    return FlushIterator(&buffer_[buffer_end_]);
   }
 
  protected:

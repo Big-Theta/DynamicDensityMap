@@ -352,7 +352,7 @@ class DynamicHistogram {
   std::vector<double> decay_factors_;
 
   void flush(FlushIterator<double>* flush_it) {
-    for (; *flush_it != insertion_buffer_.end(); ++(*flush_it)) {
+    for (; *flush_it; ++(*flush_it)) {
       flushValue(**flush_it);
     }
     refresh();
