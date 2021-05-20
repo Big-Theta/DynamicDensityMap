@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -67,7 +68,7 @@ class Kernel {
     return *this;
   }
 
-  std::string debugString() {
+  std::string debugString() const {
     std::string s = "Kernel{mean: " + std::to_string(mean()) +
                     ", variance: " + std::to_string(variance()) +
                     ", count: " + std::to_string(count()) + "}";
@@ -96,6 +97,10 @@ class Kernel {
     return mean_;
   }
 
+  double standard_deviation() const {
+    return sqrt(variance());
+  }
+
   double variance() const {
     return S_ / weighted_sum_;
   }
@@ -106,6 +111,11 @@ class Kernel {
 
   uint64_t generation() const {
     return generation_;
+  }
+
+  double cdf(double value) const {
+    double z = (value - mean()) / standard_deviation();
+    return 0.5 * erfc(-z * M_SQRT1_2);
   }
 
   static bool lessThan(double value, const Kernel& b) {
@@ -119,10 +129,15 @@ class Kernel {
         a.weighted_sum_squares_ + b.weighted_sum_squares_;
     assert(a.generation_ == b.generation_);
     kernel.generation_ = a.generation_;
-    kernel.mean_ = (a.mean_ * a.weighted_sum_ + b.mean_ * b.weighted_sum_) /
-                   kernel.weighted_sum_;
-    kernel.S_ = (a.weighted_sum_ - 1.0) * a.variance() +
-                (b.weighted_sum_ - 1.0) * b.variance();
+    if (a.weighted_sum_ <= 1.0 || b.weighted_sum_ <= 1.0) {
+      kernel.mean_ = (a.mean_ + b.mean_) / 2.0;
+      kernel.S_ = 0.0;
+    } else {
+      kernel.mean_ = (a.mean_ * a.weighted_sum_ + b.mean_ * b.weighted_sum_) /
+                     kernel.weighted_sum_;
+      kernel.S_ = (a.weighted_sum_ - 1.0) * a.variance() +
+                  (b.weighted_sum_ - 1.0) * b.variance();
+    }
     return kernel;
   }
 
@@ -173,16 +188,64 @@ class DynamicKDE {
     return total_count_;
   }
 
-  double getMean() { return -1.0; }
+  double getMean() {
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
+
+    double acc = 0.0;
+    for (const auto& kernel : kernels_) {
+      acc += kernel.mean() * kernel.count();
+    }
+
+    return acc / total_count_;
+  }
 
   // quantile is in [0, 1]
-  double getQuantileEstimate(double quantile) { return -1.0; }
+  double getQuantileEstimate(double quantile) {
+    static constexpr double kError = 1e-9;
+    double low = kernels_[0].mean();
+    double high = kernels_[kernels_.size() - 1].mean();
 
-  double getQuantileOfValue(double value) { return -1.0; }
+    while (getQuantileOfValue(low) > quantile) {
+      low -= high - low;
+    }
+
+    while (getQuantileOfValue(high) < quantile) {
+      high += high - low;
+    }
+
+    double value;
+    double estimated_quantile;
+    do {
+      value = (low + high) / 2.0;
+      estimated_quantile = getQuantileOfValue(value);
+      if (estimated_quantile < quantile) {
+        low = value;
+      } else {
+        high = value;
+      }
+    } while (std::abs(quantile - estimated_quantile) > kError);
+
+    return value;
+  }
+
+  double getQuantileOfValue(double value) {
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
+
+    double count = 0.0;
+    for (const auto& kernel : kernels_) {
+      count += kernel.cdf(value) * kernel.count();
+    }
+
+    return count / total_count_;
+  }
 
   std::string debugString() {
     std::string s = "DynamicKDE{mean: " + std::to_string(getMean()) +
                     ", count: " + std::to_string(computeTotalCount()) + ",\n";
+    s += "splitThreshold: " + std::to_string(splitThreshold()) + "\n";
+    s += "generation: " + std::to_string(generation_) + "\n";
     for (auto kernel : kernels_) {
       s += "  " + kernel.debugString() + ",\n";
     }
@@ -201,7 +264,7 @@ class DynamicKDE {
 
  private:
   const double decay_rate_;
-  const int refresh_interval_;
+  const size_t refresh_interval_;
 
   uint64_t generation_;
   uint64_t refresh_generation_;
@@ -224,7 +287,7 @@ class DynamicKDE {
     size_t kx = std::distance(kernels_.begin(),
                               std::upper_bound(kernels_.begin(), kernels_.end(),
                                                val, Kernel::lessThan));
-    printf("kx: %zu, num_kernels: %zu\n", kx, getNumKernels());
+    generation_++;
     int num_splits = 0;
     if (kx == 0) {
       kernels_[kx].decay(decay_factor(kernels_[kx].generation()), generation_);
@@ -256,9 +319,6 @@ class DynamicKDE {
         split(kx - 1);
         num_splits++;
       }
-
-      printf("??? kx: %zu, val: %lf, %s\n", kx, val,
-             kernels_[kx].debugString().c_str());
     }
 
     while (num_splits--) {
@@ -287,7 +347,7 @@ class DynamicKDE {
     }
 
     total_count_ = 0.0;
-    for (int kx = 0; kx < kernels_.size(); kx++) {
+    for (size_t kx = 0; kx < kernels_.size(); kx++) {
       kernels_[kx].decay(decay_factor(kernels_[kx].generation()), generation_);
       total_count_ += kernels_[kx].count();
     }
@@ -295,10 +355,9 @@ class DynamicKDE {
   }
 
   void split(size_t kx) {
-    printf("> split(%zu)\n", kx);
     kernels_.resize(kernels_.size() + 1);
 
-    for (size_t x = kernels_.size(); x > kx; --x) {
+    for (size_t x = kernels_.size() - 1; x > kx; --x) {
       kernels_[x] = kernels_[x - 1];
     }
 
@@ -307,7 +366,7 @@ class DynamicKDE {
   }
 
   void merge() {
-    printf("> merge()\n");
+    refresh();
     size_t best_kx = 0;
     double smallest_sum = kernels_[0].count() + kernels_[1].count();
     for (size_t kx = 1; kx + 1 < kernels_.size(); kx++) {
@@ -320,7 +379,7 @@ class DynamicKDE {
 
     kernels_[best_kx] = Kernel::merge(kernels_[best_kx], kernels_[best_kx + 1]);
 
-    for (size_t kx = best_kx + 1; kx < kernels_.size(); kx++) {
+    for (size_t kx = best_kx + 1; kx + 1 < kernels_.size(); kx++) {
       kernels_[kx] = kernels_[kx + 1];
     }
 
