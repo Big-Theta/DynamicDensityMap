@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using dhist::Kernel;
 using dhist::DynamicKDE;
 using dynamic_histogram::DensityMap;
 using testing::ContainerEq;
@@ -27,7 +28,30 @@ double exponential_sum(double a, double r, int n) {
   return a * (1.0 - pow(r, n)) / (1 - r);
 }
 
-TEST(ReferenceTest, addNoDecay) {
+TEST(KernelTest, addValue) {
+  Kernel k;
+  k.addValue(1.0, 1.0);
+  k.addValue(3.0, 1.0);
+  k.addValue(5.0, 1.0);
+  k.addValue(7.0, 1.0);
+
+  EXPECT_EQ(k.mean(), 4.0);
+  EXPECT_EQ(k.variance(), 5.0);
+}
+
+TEST(KernelTest, decay) {
+  Kernel k;
+  k.addValue(1.0, 1.0);
+  k.addValue(3.0, 1.0);
+  k.addValue(5.0, 1.0);
+  k.addValue(7.0, 1.0);
+  k.decay(0.9);
+
+  EXPECT_EQ(k.mean(), 4.0);
+  EXPECT_EQ(k.variance(), 5.0);
+}
+
+TEST(DynamicKDETest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
   DynamicKDE uut(/*max_num_buckets=*/31, /*decay_rate=*/kDecayRate);

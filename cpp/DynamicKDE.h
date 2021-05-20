@@ -41,26 +41,57 @@ using ::google::protobuf::Timestamp;
 
 class Kernel {
  public:
-  Kernel() = default;
+  Kernel()
+      : mean_(0.0), weighted_sum_(0.0), weighted_sum_squares_(0.0), S_(0.0) {}
+
   ~Kernel() = default;
 
   Kernel(const Kernel& other) {
     mean_ = other.mean_;
-    var_ = other.var_;
-    count_ = other.mean_;
+    weighted_sum_ = other.weighted_sum_;
+    weighted_sum_squares_ = other.weighted_sum_squares_;
+    S_ = other.S_;
   }
 
   Kernel& operator=(const Kernel& other) {
     mean_ = other.mean_;
-    var_ = other.var_;
-    count_ = other.mean_;
+    weighted_sum_ = other.weighted_sum_;
+    weighted_sum_squares_ = other.weighted_sum_squares_;
+    S_ = other.S_;
     return *this;
+  }
+
+  void addValue(double value, double weight) {
+    weighted_sum_ += weight;
+    weighted_sum_squares_ += weight * weight;
+    double old_mean = mean_;
+    mean_ += (weight / weighted_sum_) * (value - old_mean);
+    S_ += weight * (value - old_mean) * (value - mean_);
+  }
+
+  void decay(double factor) {
+    weighted_sum_ *= factor;
+    weighted_sum_squares_ *= factor;
+    S_ *= factor;
+  }
+
+  double mean() const {
+    return mean_;
+  }
+
+  double variance() const {
+    return S_ / weighted_sum_;
+  }
+
+  double count() const {
+    return weighted_sum_;
   }
 
  private:
   double mean_;
-  double var_;
-  double count_;
+  double weighted_sum_;
+  double weighted_sum_squares_;
+  double S_;
 };
 
 class DynamicKDE {
