@@ -2,10 +2,12 @@
 
 from matplotlib import animation
 from matplotlib import pyplot
+from scipy.stats import norm
 from typing import Dict, List
 
 import argparse
-import DensityMap_pb2
+import bisect
+import DynamicDensity_pb2
 import json
 import numpy as np
 import os
@@ -54,7 +56,7 @@ def extract_histograms(data: str) -> List[dict]:
     return [c for c in cleaned if check_histogram(c)]
 
 
-def proto_to_histogram(proto: DensityMap_pb2.DynamicHistogram) -> dict:
+def dhist_to_histogram(proto: DynamicDensity_pb2.DynamicHistogram) -> dict:
     hist = {
         "bounds": proto.bounds,
         "counts": proto.counts,
@@ -64,6 +66,32 @@ def proto_to_histogram(proto: DensityMap_pb2.DynamicHistogram) -> dict:
     if proto.HasField("label"):
         hist["label"] = proto.label
     return hist
+
+
+def prepare_render_dkde(proto: DynamicDensity_pb2.DynamicKDE,
+                        alpha: float = 1.0):
+    total = sum([kernel.count for kernel in proto.kernels])
+    x_min = proto.kernels[0].coord[0] - 6 * proto.kernels[0].variance[0]
+    x_max = proto.kernels[-1].coord[0] + 6 * proto.kernels[-1].variance[0]
+    x_d = np.linspace(x_min, x_max, 1000)
+    y_d = np.zeros(1000)
+    norms = [norm(k.coord[0], np.sqrt(k.variance[0])) for k in proto.kernels]
+    for dist_i, dist in enumerate(norms):
+        weight = proto.kernels[dist_i].count / total
+        low = bisect.bisect_right(x_d, dist.mean() - 6 * dist.std())
+        high = bisect.bisect_right(x_d, dist.mean() + 6 * dist.std())
+        for i in range(low, high):
+            y_d[i] += dist.pdf(x_d[i]) * weight
+
+    title = ""
+    if proto.HasField("title"):
+        title = proto.title
+    label = ""
+    if len(proto.label):
+        label = proto.label[0]
+
+    pyplot.title(title)
+    pyplot.fill_between(x_d, y_d, alpha=alpha, label=label)
 
 
 def gen_histograms(data: str):
@@ -200,19 +228,24 @@ if __name__ == "__main__":
             else:
                 raise FileNotFoundError(f"Unable to find file '{args.proto}'")
 
-        #print(help(DensityMap_pb2.DensityMap.ParseFromString))
+        #print(help(DynamicDensity_pb2.DynamicDensity.ParseFromString))
         with open(path, "rb") as proto_in:
             serialized = proto_in.read()
-        dhist = DensityMap_pb2.DensityMap()
-        dhist.ParseFromString(serialized)
-        hist = proto_to_histogram(dhist.dynamic_histogram)
-        assert(check_histogram(hist))
 
-        pyplot.title(hist.get("title", ""))
-        label = hist.get("label", "")
-        prepare_render(hist, label=label, alpha=1.0)
+        ddens = DynamicDensity_pb2.DensityMap()
+        ddens.ParseFromString(serialized)
+
+        if ddens.HasField("dynamic_histogram"):
+            hist = dhist_to_histogram(ddens.dynamic_histogram)
+            assert(check_histogram(hist))
+
+            pyplot.title(hist.get("title", ""))
+            label = hist.get("label", "")
+            prepare_render(hist, label=label, alpha=1.0)
+        else:
+            prepare_render_dkde(ddens.dynamic_kde)
+
         pyplot.legend()
         pyplot.show()
     else:
         parser.print_help()
-

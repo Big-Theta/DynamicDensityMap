@@ -285,10 +285,10 @@ TEST(DynamicHistogramTest, toProto) {
       dm.dynamic_histogram().bounds()[dm.dynamic_histogram().bounds_size() - 1],
       uut.getMax());
 
-  // std::ofstream myfile("/tmp/DensityMapTest.pb");
-  // ASSERT_TRUE(myfile.is_open());
-  // ASSERT_TRUE(dm.SerializeToOstream(&myfile));
-  // myfile.close();
+  std::ofstream myfile("/tmp/DynamicHistogram.pbuf");
+  ASSERT_TRUE(myfile.is_open());
+  ASSERT_TRUE(dm.SerializeToOstream(&myfile));
+  myfile.close();
 }
 
 struct TypedTestTrue {

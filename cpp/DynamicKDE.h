@@ -71,11 +71,21 @@ class Kernel {
   std::string debugString() const {
     std::string s = "Kernel{mean: " + std::to_string(mean()) +
                     ", variance: " + std::to_string(variance()) +
-                    ", count: " + std::to_string(count()) + "}";
+                    ", count: " + std::to_string(count()) +
+                    ", ws: " + std::to_string(weighted_sum_) +
+                    ", ws2: " + std::to_string(weighted_sum_squares_) + "}";
     return s;
   }
 
   void addValue(double value, double weight) {
+    if (weighted_sum_ == 0.0) {
+      mean_ = value;
+      weighted_sum_ = weight;
+      weighted_sum_squares_ = weight * weight;
+      S_ = 0.0;
+      return;
+    }
+
     weighted_sum_ += weight;
     weighted_sum_squares_ += weight * weight;
     double old_mean = mean_;
@@ -93,25 +103,20 @@ class Kernel {
     S_ *= factor;
   }
 
-  double mean() const {
-    return mean_;
-  }
+  double mean() const { return mean_; }
 
-  double standardDeviation() const {
-    return sqrt(variance());
-  }
+  double standardDeviation() const { return sqrt(variance()); }
 
   double variance() const {
+    if (weighted_sum_ == 0.0) {
+      return 0.0;
+    }
     return S_ / weighted_sum_;
   }
 
-  double count() const {
-    return weighted_sum_;
-  }
+  double count() const { return weighted_sum_; }
 
-  uint64_t generation() const {
-    return generation_;
-  }
+  uint64_t generation() const { return generation_; }
 
   double cdf(double value) const {
     double z = (value - mean()) / standardDeviation();
@@ -129,15 +134,21 @@ class Kernel {
   }
 
   static Kernel merge(const Kernel& a, const Kernel& b) {
+    assert(a.generation_ == b.generation_);
     Kernel kernel;
     kernel.weighted_sum_ = a.weighted_sum_ + b.weighted_sum_;
     kernel.weighted_sum_squares_ =
         a.weighted_sum_squares_ + b.weighted_sum_squares_;
-    assert(a.generation_ == b.generation_);
     kernel.generation_ = a.generation_;
-    if (a.weighted_sum_ <= 1.0 || b.weighted_sum_ <= 1.0) {
+    if (kernel.weighted_sum_ == 0.0) {
       kernel.mean_ = (a.mean_ + b.mean_) / 2.0;
       kernel.S_ = 0.0;
+    } else if (a.weighted_sum_ < 1.0) {
+      kernel.mean_ = b.mean_;
+      kernel.S_ = b.S_;
+    } else if (b.weighted_sum_ < 1.0) {
+      kernel.mean_ = a.mean_;
+      kernel.S_ = a.S_;
     } else {
       kernel.mean_ = (a.mean_ * a.weighted_sum_ + b.mean_ * b.weighted_sum_) /
                      kernel.weighted_sum_;
@@ -265,7 +276,7 @@ class DynamicKDE {
 
   DensityMap toProto(std::string title = "", std::string label = "") {
     DensityMap dm;
-    auto *dkde = dm.mutable_dynamic_kde();
+    auto* dkde = dm.mutable_dynamic_kde();
 
     if (!title.empty()) {
       dkde->set_title(title);
@@ -275,7 +286,7 @@ class DynamicKDE {
       dkde->add_label(label);
     }
 
-    //dkde->set_timestamp(google::protobuf::util::GetCurrentTime());
+    // dkde->set_timestamp(google::protobuf::util::GetCurrentTime());
 
     dkde->set_decay_rate(decay_rate_);
 

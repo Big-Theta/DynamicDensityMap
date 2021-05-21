@@ -12,8 +12,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using dhist::Kernel;
 using dhist::DynamicKDE;
+using dhist::Kernel;
 using dynamic_density::DensityMap;
 using testing::ContainerEq;
 using testing::Eq;
@@ -141,7 +141,7 @@ TEST(DynamicKDETest, toProto) {
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 
-  static constexpr int kNumValues = 100000;
+  static constexpr int kNumValues = 1000000;
   for (int i = 0; i < kNumValues; i++) {
     uut.addValue(norm(gen));
   }
@@ -151,14 +151,12 @@ TEST(DynamicKDETest, toProto) {
   EXPECT_EQ(dm.dynamic_kde().title(), "test");
   EXPECT_EQ(dm.dynamic_kde().label()[0], "x-value");
 
-  //printf("??? %s\n", dm.DebugString().c_str());
-
   size_t size = dm.dynamic_kde().kernels().size();
   EXPECT_EQ(size, 61);
   EXPECT_LT(dm.dynamic_kde().kernels()[0].coord()[0], 10000.0);
   EXPECT_GT(dm.dynamic_kde().kernels()[size - 1].coord()[0], 10000.0);
 
-  // std::ofstream myfile("/tmp/DensityMapTest.pb");
+  // std::ofstream myfile("/tmp/DynamicKDE.pbuf");
   // ASSERT_TRUE(myfile.is_open());
   // ASSERT_TRUE(dm.SerializeToOstream(&myfile));
   // myfile.close();
