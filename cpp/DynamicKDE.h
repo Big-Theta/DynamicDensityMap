@@ -32,12 +32,12 @@
 #include <map>
 #include <vector>
 
-#include "DensityMap.pb.h"
+#include "DynamicDensity.pb.h"
 #include "cpp/InsertionBuffer.h"
 
 namespace dhist {
 
-using ::dynamic_histogram::DensityMap;
+using ::dynamic_density::DensityMap;
 using ::google::protobuf::Timestamp;
 
 class Kernel {
@@ -97,7 +97,7 @@ class Kernel {
     return mean_;
   }
 
-  double standard_deviation() const {
+  double standardDeviation() const {
     return sqrt(variance());
   }
 
@@ -114,8 +114,14 @@ class Kernel {
   }
 
   double cdf(double value) const {
-    double z = (value - mean()) / standard_deviation();
+    double z = (value - mean()) / standardDeviation();
     return 0.5 * erfc(-z * M_SQRT1_2);
+  }
+
+  void populateProto(::dynamic_density::DynamicKDE_Kernel* proto) const {
+    proto->add_coord(mean());
+    proto->add_variance(variance());
+    proto->set_count(count());
   }
 
   static bool lessThan(double value, const Kernel& b) {
@@ -257,8 +263,27 @@ class DynamicKDE {
     return "";
   }
 
-  DensityMap to_proto(std::string title = "", std::string label = "") {
+  DensityMap toProto(std::string title = "", std::string label = "") {
     DensityMap dm;
+    auto *dkde = dm.mutable_dynamic_kde();
+
+    if (!title.empty()) {
+      dkde->set_title(title);
+    }
+
+    if (!label.empty()) {
+      dkde->add_label(label);
+    }
+
+    //dkde->set_timestamp(google::protobuf::util::GetCurrentTime());
+
+    dkde->set_decay_rate(decay_rate_);
+
+    for (const auto& kernel : kernels_) {
+      ::dynamic_density::DynamicKDE::Kernel* k_proto = dkde->add_kernels();
+      kernel.populateProto(k_proto);
+    }
+
     return dm;
   }
 

@@ -7,7 +7,7 @@
 #include <thread>
 #include <vector>
 
-#include "DensityMap.pb.h"
+#include "DynamicDensity.pb.h"
 #include "cpp/DynamicHistogram.h"
 #include "cpp/DynamicHistogramReference.h"
 #include "gmock/gmock.h"
@@ -16,7 +16,7 @@
 using dhist::DynamicHistogram;
 using dhist::DynamicHistogramReference;
 using dhist::in_range;
-using dynamic_histogram::DensityMap;
+using dynamic_density::DensityMap;
 using testing::ContainerEq;
 using testing::Eq;
 using testing::Types;
@@ -276,7 +276,7 @@ TEST(DynamicHistogramTest, toProto) {
     uut.addValue(norm(gen));
   }
 
-  DensityMap dm = uut.to_proto("test", "x-value");
+  DensityMap dm = uut.toProto("test", "x-value");
 
   EXPECT_EQ(dm.dynamic_histogram().title(), "test");
   EXPECT_EQ(dm.dynamic_histogram().label(), "x-value");

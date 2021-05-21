@@ -7,14 +7,14 @@
 #include <thread>
 #include <vector>
 
-#include "DensityMap.pb.h"
+#include "DynamicDensity.pb.h"
 #include "cpp/DynamicKDE.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using dhist::Kernel;
 using dhist::DynamicKDE;
-using dynamic_histogram::DensityMap;
+using dynamic_density::DensityMap;
 using testing::ContainerEq;
 using testing::Eq;
 using testing::Types;
@@ -83,10 +83,24 @@ TEST(KernelTest, cdf) {
   EXPECT_NEAR(k.cdf(100.0), 1.0, 1e-10);
 }
 
+TEST(KernelTest, populateProto) {
+  Kernel k;
+  k.addValue(1.0, 0.5);
+  k.addValue(3.0, 0.5);
+  k.addValue(5.0, 0.5);
+  k.addValue(7.0, 0.5);
+
+  ::dynamic_density::DynamicKDE::Kernel proto;
+  k.populateProto(&proto);
+  EXPECT_EQ(proto.coord()[0], 4.0);
+  EXPECT_EQ(proto.variance()[0], 5.0);
+  EXPECT_EQ(proto.count(), 2.0);
+}
+
 TEST(DynamicKDETest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
-  DynamicKDE uut(/*max_num_buckets=*/31, /*decay_rate=*/kDecayRate);
+  DynamicKDE uut(/*num_kernels=*/31, /*decay_rate=*/kDecayRate);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -100,4 +114,52 @@ TEST(DynamicKDETest, addNoDecay) {
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
 
   EXPECT_NEAR(uut.getMean(), 0.0, 1e-1) << uut.debugString();
+}
+
+TEST(DynamicKDETest, addWithDecay) {
+  static constexpr int kNumValues = 100000;
+  static constexpr double kDecayRate = 0.00001;
+  DynamicKDE uut(/*num_kernels=*/31, /*decay_rate=*/kDecayRate);
+  std::default_random_engine gen;
+  std::normal_distribution<double> norm(0.0, 1.0);
+
+  for (int i = 0; i < kNumValues; i++) {
+    uut.addValue(norm(gen));
+  }
+
+  EXPECT_NEAR(uut.computeTotalCount(),
+              exponential_sum(1, 1 - kDecayRate, kNumValues), 1e-6);
+  EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1);
+  EXPECT_NEAR(uut.getQuantileEstimate(0.05), -1.644854, 1e-1);
+  EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
+
+  EXPECT_NEAR(uut.getMean(), 0.0, 1e-1) << uut.debugString();
+}
+
+TEST(DynamicKDETest, toProto) {
+  DynamicKDE uut(/*num_kernels=*/61);
+  std::normal_distribution<double> norm(10000.0, 1.0);
+  std::default_random_engine gen;
+
+  static constexpr int kNumValues = 100000;
+  for (int i = 0; i < kNumValues; i++) {
+    uut.addValue(norm(gen));
+  }
+
+  DensityMap dm = uut.toProto("test", "x-value");
+
+  EXPECT_EQ(dm.dynamic_kde().title(), "test");
+  EXPECT_EQ(dm.dynamic_kde().label()[0], "x-value");
+
+  //printf("??? %s\n", dm.DebugString().c_str());
+
+  size_t size = dm.dynamic_kde().kernels().size();
+  EXPECT_EQ(size, 61);
+  EXPECT_LT(dm.dynamic_kde().kernels()[0].coord()[0], 10000.0);
+  EXPECT_GT(dm.dynamic_kde().kernels()[size - 1].coord()[0], 10000.0);
+
+  // std::ofstream myfile("/tmp/DensityMapTest.pb");
+  // ASSERT_TRUE(myfile.is_open());
+  // ASSERT_TRUE(dm.SerializeToOstream(&myfile));
+  // myfile.close();
 }

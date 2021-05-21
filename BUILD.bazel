@@ -5,7 +5,7 @@ cc_library(
     name = "dynamic_histogram",
     hdrs = ["cpp/DynamicHistogram.h"],
     deps = [
-        ":density_map_cc_proto",
+        ":dynamic_density_cc_proto",
         ":timestamp_cc_proto",
         ":insertion_buffer",
     ],
@@ -28,7 +28,7 @@ cc_test(
     name = "dynamic_histogram_test",
     srcs = ["cpp/DynamicHistogramTest.cpp"],
     deps = [
-        ":density_map_cc_proto",
+        ":dynamic_density_cc_proto",
         ":dynamic_histogram",
         ":dynamic_histogram_reference",
         "@gtest//:gtest",
@@ -43,7 +43,7 @@ cc_library(
     name = "dynamic_kde",
     hdrs = ["cpp/DynamicKDE.h"],
     deps = [
-        ":density_map_cc_proto",
+        ":dynamic_density_cc_proto",
         ":timestamp_cc_proto",
         ":insertion_buffer",
     ],
@@ -57,7 +57,7 @@ cc_test(
     name = "dynamic_kde_test",
     srcs = ["cpp/DynamicKDETest.cpp"],
     deps = [
-        ":density_map_cc_proto",
+        ":dynamic_density_cc_proto",
         ":dynamic_kde",
         "@gtest//:gtest",
         "@gtest//:gtest_main"
@@ -82,14 +82,14 @@ cc_binary(
 )
 
 proto_library(
-    name = "density_map_proto",
-    srcs = ["DensityMap.proto"],
+    name = "dynamic_density_proto",
+    srcs = ["DynamicDensity.proto"],
     deps = ["@com_google_protobuf//:timestamp_proto"],
 )
 
 cc_proto_library(
-    name = "density_map_cc_proto",
-    deps = [":density_map_proto"],
+    name = "dynamic_density_cc_proto",
+    deps = [":dynamic_density_proto"],
 )
 
 cc_proto_library(
@@ -98,8 +98,8 @@ cc_proto_library(
 )
 
 py_proto_library(
-    name = "density_map_py_proto",
-    srcs = ["DensityMap.proto"],
+    name = "dynamic_density_py_proto",
+    srcs = ["DynamicDensity.proto"],
     deps = ["@com_google_protobuf//:protobuf_python"],
 )
 
@@ -107,7 +107,7 @@ py_binary(
     name = "show_histogram",
     srcs = ["show_histogram.py"],
     deps = [
-        ":density_map_py_proto",
+        ":dynamic_density_py_proto",
     ],
 )
 

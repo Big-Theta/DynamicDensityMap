@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package dynamic_histogram;
+package dynamic_density;
 
 import "google/protobuf/timestamp.proto";
 
@@ -21,6 +21,7 @@ message DynamicKDE {
     repeated double coord = 1;
     repeated double variance = 2;
     optional double covariance = 3;
+    optional double count = 4;
   }
 
   optional string title = 1;

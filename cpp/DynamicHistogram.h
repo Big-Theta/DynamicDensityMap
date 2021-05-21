@@ -31,12 +31,12 @@
 #include <map>
 #include <vector>
 
-#include "DensityMap.pb.h"
+#include "DynamicDensity.pb.h"
 #include "cpp/InsertionBuffer.h"
 
 namespace dhist {
 
-using ::dynamic_histogram::DensityMap;
+using ::dynamic_density::DensityMap;
 using ::google::protobuf::Timestamp;
 
 bool in_range(double val, double a, double b) {
@@ -296,7 +296,7 @@ class DynamicHistogram {
     return s;
   }
 
-  DensityMap to_proto(std::string title = "", std::string label = "") {
+  DensityMap toProto(std::string title = "", std::string label = "") {
     DensityMap dm;
     auto *dhist = dm.mutable_dynamic_histogram();
 
