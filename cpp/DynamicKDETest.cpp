@@ -161,3 +161,15 @@ TEST(DynamicKDETest, toProto) {
   // ASSERT_TRUE(dm.SerializeToOstream(&myfile));
   // myfile.close();
 }
+
+TEST(DynamicKDETest, count) {
+  DynamicKDE uut(/*num_kernels=*/61);
+  std::normal_distribution<double> norm(10000.0, 1.0);
+  std::default_random_engine gen;
+
+  static constexpr int kNumValues = 1000000;
+  for (int i = 0; i < kNumValues; i++) {
+    uut.addValue(norm(gen));
+    ASSERT_EQ(uut.computeTotalCount(), i + 1) << uut.debugString();
+  }
+}

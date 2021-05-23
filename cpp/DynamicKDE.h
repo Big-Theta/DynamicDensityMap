@@ -259,6 +259,9 @@ class DynamicKDE {
   }
 
   std::string debugString() {
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
+
     std::string s = "DynamicKDE{mean: " + std::to_string(getMean()) +
                     ", count: " + std::to_string(computeTotalCount()) + ",\n";
     s += "splitThreshold: " + std::to_string(splitThreshold()) + "\n";
@@ -271,10 +274,16 @@ class DynamicKDE {
   }
 
   std::string json(std::string title = "", std::string label = "") {
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
+
     return "";
   }
 
   DensityMap toProto(std::string title = "", std::string label = "") {
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
+
     DensityMap dm;
     auto* dkde = dm.mutable_dynamic_kde();
 
