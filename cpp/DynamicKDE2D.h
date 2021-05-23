@@ -81,11 +81,11 @@ class Kernel2D {
 
   std::string debugString() const {
     std::string s = "Kernel2D{mean_x: " + std::to_string(mean_x()) +
-                    "mean_y: " + std::to_string(mean_y()) +
-                    "variance_xx: " + std::to_string(variance_xx()) +
-                    "variance_yy: " + std::to_string(variance_yy()) +
-                    "covariance: " + std::to_string(covariance()) +
-                    "weighted_sum: " + std::to_string(weighted_sum_) + "}";
+                    ", mean_y: " + std::to_string(mean_y()) +
+                    ", variance_xx: " + std::to_string(variance_xx()) +
+                    ", variance_yy: " + std::to_string(variance_yy()) +
+                    ", covariance: " + std::to_string(covariance()) +
+                    ", weighted_sum: " + std::to_string(weighted_sum_) + "}";
     return s;
   }
 
@@ -261,7 +261,7 @@ class DynamicKDE2D {
     flush(&flush_it);
 
     std::string s =
-        "DynamicKDE2D{count: " + std::to_string(computeTotalCount()) + ",\n";
+        "DynamicKDE2D{count: " + std::to_string(total_count_) + ",\n";
     s += "splitThreshold: " + std::to_string(splitThreshold()) + "\n";
     s += "generation: " + std::to_string(generation_) + "\n";
     for (auto kernel : kernels_) {
@@ -327,9 +327,13 @@ class DynamicKDE2D {
   }
 
   void flushValue(const std::pair<double, double>& val) {
+    static constexpr size_t N = 3;
     std::vector<size_t> best_kxs;
-    best_kxs.resize(4);
-    double best_distances[4] = {std::numeric_limits<double>::max()};
+    best_kxs.resize(N);
+    double best_distances[N];
+    for (size_t i = 0; i < N; i++) {
+      best_distances[i] = std::numeric_limits<double>::max();
+    }
 
     for (size_t kx = 0; kx < kernels_.size(); kx++) {
       const auto& kernel = kernels_[kx];
@@ -337,13 +341,14 @@ class DynamicKDE2D {
       double dy = kernel.mean_y() - val.second;
       double dist = dx * dx + dy * dy;
 
-      if (dist >= best_distances[3]) {
+      if (dist >= best_distances[N - 1]) {
         continue;
       }
 
-      size_t idx = 3;
+      size_t idx = N - 1;
       while (idx > 0 && dist < best_distances[idx - 1]) {
         best_kxs[idx] = best_kxs[idx - 1];
+        best_distances[idx] = best_distances[idx - 1];
         idx--;
       }
 
@@ -428,6 +433,14 @@ class DynamicKDE2D {
       }
     }
 
+    double dx = kernels_[best_kx[0]].mean_x() - kernels_[best_kx[1]].mean_x();
+    double dy = kernels_[best_kx[0]].mean_y() - kernels_[best_kx[1]].mean_y();
+    printf("merging\n\t%s\n\t%s\n\tsum: %lf, dist: %lf\n",
+           kernels_[best_kx[0]].debugString().c_str(),
+           kernels_[best_kx[1]].debugString().c_str(),
+           kernels_[best_kx[0]].count() + kernels_[best_kx[1]].count(),
+           sqrt(dx * dx + dy * dy));
+
     kernels_[best_kx[0]] =
         Kernel2D::merge(kernels_[best_kx[0]], kernels_[best_kx[1]]);
     kernels_.erase(kernels_.begin() + best_kx[1]);
@@ -440,8 +453,9 @@ class DynamicKDE2D {
       if (x == kx) {
         continue;
       }
-      double dist = (kernels_[kx].mean_x() - kernels_[x].mean_x()) *
-                    (kernels_[kx].mean_y() - kernels_[x].mean_y());
+      double dx = kernels_[kx].mean_x() - kernels_[x].mean_x();
+      double dy = kernels_[kx].mean_y() - kernels_[x].mean_y();
+      double dist = dx * dx + dy * dy;
       if (dist < best_dist) {
         best_dist = dist;
         best_x = x;

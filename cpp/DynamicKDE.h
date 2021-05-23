@@ -209,12 +209,7 @@ class DynamicKDE {
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
 
-    double acc = 0.0;
-    for (const auto& kernel : kernels_) {
-      acc += kernel.mean() * kernel.count();
-    }
-
-    return acc / total_count_;
+    return getMeanNoLock();
   }
 
   // quantile is in [0, 1]
@@ -262,7 +257,7 @@ class DynamicKDE {
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
 
-    std::string s = "DynamicKDE{mean: " + std::to_string(getMean()) +
+    std::string s = "DynamicKDE{mean: " + std::to_string(getMeanNoLock()) +
                     ", count: " + std::to_string(computeTotalCount()) + ",\n";
     s += "splitThreshold: " + std::to_string(splitThreshold()) + "\n";
     s += "generation: " + std::to_string(generation_) + "\n";
@@ -429,6 +424,15 @@ class DynamicKDE {
     }
 
     kernels_.pop_back();
+  }
+
+  double getMeanNoLock() const {
+    double acc = 0.0;
+    for (const auto& kernel : kernels_) {
+      acc += kernel.mean() * kernel.count();
+    }
+
+    return acc / total_count_;
   }
 };
 

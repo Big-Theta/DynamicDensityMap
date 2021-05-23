@@ -91,29 +91,44 @@ TEST(KernelTest, populateProto) {
   EXPECT_EQ(proto.count(), 2.0);
 }
 
-//TEST(DynamicKDETest, addNoDecay) {
-//  static constexpr int kNumValues = 100000;
-//  static constexpr double kDecayRate = 0.0;
-//  DynamicKDE uut(/*num_kernels=*/31, /*decay_rate=*/kDecayRate);
-//  std::default_random_engine gen;
-//  std::normal_distribution<double> norm(0.0, 1.0);
-//
-//  for (int i = 0; i < kNumValues; i++) {
-//    uut.addValue(norm(gen));
-//  }
-//
-//  EXPECT_EQ(uut.computeTotalCount(), kNumValues);
-//  EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1);
-//  EXPECT_NEAR(uut.getQuantileEstimate(0.05), -1.644854, 1e-1);
-//  EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
-//
-//  EXPECT_NEAR(uut.getMean(), 0.0, 1e-1) << uut.debugString();
-//}
-//
-//TEST(DynamicKDETest, addWithDecay) {
+TEST(DynamicKDE2DTest, addNoDecay) {
+  static constexpr int kNumValues = 1000000;
+  static constexpr double kDecayRate = 0.0;
+  DynamicKDE2D uut(/*num_kernels=*/100, /*decay_rate=*/kDecayRate);
+  std::default_random_engine gen;
+  std::normal_distribution<double> norm(0.0, 1.0);
+  std::uniform_real_distribution unif(0.0, 1.0);
+  std::discrete_distribution<int> discrete{1, 1, 1, 1};
+
+  for (int i = 0; i < kNumValues; i++) {
+    switch (discrete(gen)) {
+    case 0:
+      uut.addValue(norm(gen), norm(gen));
+      break;
+    case 1:
+      uut.addValue(norm(gen) + 1, norm(gen) + 1);
+      break;
+    case 2:
+      uut.addValue(norm(gen) - 10, norm(gen) - 7);
+      break;
+    default:
+      uut.addValue(2 * unif(gen) + 10, 3 * unif(gen) + 10);
+      break;
+    }
+  }
+
+  EXPECT_EQ(uut.computeTotalCount(), kNumValues);
+
+  // std::ofstream myfile("/tmp/DynamicKDE2D.pbuf");
+  // ASSERT_TRUE(myfile.is_open());
+  // ASSERT_TRUE(uut.toProto().SerializeToOstream(&myfile));
+  // myfile.close();
+}
+
+//TEST(DynamicKDE2DTest, addWithDecay) {
 //  static constexpr int kNumValues = 100000;
 //  static constexpr double kDecayRate = 0.00001;
-//  DynamicKDE uut(/*num_kernels=*/31, /*decay_rate=*/kDecayRate);
+//  DynamicKDE2D uut(/*num_kernels=*/31, /*decay_rate=*/kDecayRate);
 //  std::default_random_engine gen;
 //  std::normal_distribution<double> norm(0.0, 1.0);
 //
@@ -130,8 +145,8 @@ TEST(KernelTest, populateProto) {
 //  EXPECT_NEAR(uut.getMean(), 0.0, 1e-1) << uut.debugString();
 //}
 //
-//TEST(DynamicKDETest, toProto) {
-//  DynamicKDE uut(/*num_kernels=*/61);
+//TEST(DynamicKDE2DTest, toProto) {
+//  DynamicKDE2D uut(/*num_kernels=*/61);
 //  std::normal_distribution<double> norm(10000.0, 1.0);
 //  std::default_random_engine gen;
 //
@@ -156,7 +171,7 @@ TEST(KernelTest, populateProto) {
 //  // myfile.close();
 //}
 //
-//TEST(DynamicKDETest, count) {
+//TEST(DynamicKDE2DTest, count) {
 //  DynamicKDE uut(/*num_kernels=*/61);
 //  std::normal_distribution<double> norm(10000.0, 1.0);
 //  std::default_random_engine gen;
