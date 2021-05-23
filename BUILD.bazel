@@ -67,6 +67,34 @@ cc_test(
     ],
 )
 
+cc_library(
+    name = "dynamic_kde_2d",
+    hdrs = ["cpp/DynamicKDE2D.h"],
+    deps = [
+        ":dynamic_density_cc_proto",
+        ":timestamp_cc_proto",
+        ":insertion_buffer",
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "dynamic_kde_2d_test",
+    srcs = ["cpp/DynamicKDE2DTest.cpp"],
+    deps = [
+        ":dynamic_density_cc_proto",
+        ":dynamic_kde_2d",
+        "@gtest//:gtest",
+        "@gtest//:gtest_main"
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+)
+
 cc_binary(
     name = "dynamic_histogram_benchmark",
     srcs = ["cpp/DynamicHistogramBenchmark.cpp"],
