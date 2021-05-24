@@ -94,11 +94,13 @@ TEST(KernelTest, populateProto) {
 TEST(DynamicKDE2DTest, addNoDecay) {
   static constexpr int kNumValues = 1000000;
   static constexpr double kDecayRate = 0.0;
-  DynamicKDE2D uut(/*num_kernels=*/100, /*decay_rate=*/kDecayRate);
+  DynamicKDE2D uut(/*num_kernels=*/200, /*decay_rate=*/kDecayRate);
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
   std::uniform_real_distribution unif(0.0, 1.0);
   std::discrete_distribution<int> discrete{1, 1, 1, 1};
+
+  setbuf(stdout, 0);
 
   for (int i = 0; i < kNumValues; i++) {
     switch (discrete(gen)) {
@@ -115,14 +117,17 @@ TEST(DynamicKDE2DTest, addNoDecay) {
       uut.addValue(2 * unif(gen) + 10, 3 * unif(gen) + 10);
       break;
     }
+    ASSERT_EQ(uut.computeTotalCount(), i + 1);
   }
+
+  printf("??? %s\n", uut.toProto().DebugString().c_str());
 
   EXPECT_EQ(uut.computeTotalCount(), kNumValues);
 
-  // std::ofstream myfile("/tmp/DynamicKDE2D.pbuf");
-  // ASSERT_TRUE(myfile.is_open());
-  // ASSERT_TRUE(uut.toProto().SerializeToOstream(&myfile));
-  // myfile.close();
+  std::ofstream myfile("/tmp/DynamicKDE2D.pbuf");
+  ASSERT_TRUE(myfile.is_open());
+  ASSERT_TRUE(uut.toProto().SerializeToOstream(&myfile));
+  myfile.close();
 }
 
 //TEST(DynamicKDE2DTest, addWithDecay) {

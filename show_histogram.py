@@ -2,7 +2,7 @@
 
 from matplotlib import animation
 from matplotlib import pyplot
-from scipy.stats import norm
+from scipy.stats import norm, multivariate_normal
 from typing import Dict, List
 
 import argparse
@@ -92,6 +92,64 @@ def prepare_render_dkde(proto: DynamicDensity_pb2.DynamicKDE,
 
     pyplot.title(title)
     pyplot.fill_between(x_d, y_d, alpha=alpha, label=label)
+    pyplot.legend()
+
+
+def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
+                           alpha: float = 1.0):
+    total = sum([kernel.count for kernel in proto.kernels])
+
+    def range_x_range_y(kernel):
+        range_x = [kernel.coord[0] - 6 * kernel.variance[0],
+                   kernel.coord[0] + 6 * kernel.variance[0]]
+        range_y = [kernel.coord[1] - 6 * kernel.variance[1],
+                   kernel.coord[1] + 6 * kernel.variance[1]]
+        return range_x, range_y
+
+    range_x, range_y = range_x_range_y(proto.kernels[0])
+    for kernel in proto.kernels:
+        pos_range_x, pos_range_y = range_x_range_y(kernel)
+        range_x[0] = min(range_x[0], pos_range_x[0])
+        range_x[1] = max(range_x[1], pos_range_x[1])
+        range_y[0] = min(range_y[0], pos_range_y[0])
+        range_y[1] = max(range_y[1], pos_range_y[1])
+
+    xvals = np.linspace(range_x[0], range_x[1], 100)
+    yvals = np.linspace(range_y[0], range_y[1], 100)
+    xx, yy = np.meshgrid(xvals, yvals)
+    f = np.zeros((100, 100))
+
+    for kernel in proto.kernels:
+        dist = multivariate_normal(
+                [kernel.coord[0], kernel.coord[1]],
+                [[kernel.variance[0], kernel.covariance],
+                 [kernel.covariance, kernel.variance[1]]], allow_singular=True)
+        weight = kernel.count / total
+
+        xlow = bisect.bisect_right(
+                xvals, kernel.coord[0] - 6 * kernel.variance[0])
+        xhigh = bisect.bisect_right(
+                xvals, kernel.coord[0] + 6 * kernel.variance[0])
+        ylow = bisect.bisect_right(
+                yvals, kernel.coord[1] - 6 * kernel.variance[1])
+        yhigh = bisect.bisect_right(
+                yvals, kernel.coord[1] + 6 * kernel.variance[1])
+
+        for xi in range(xlow, xhigh):
+            xval = xvals[xi]
+            for yi in range(ylow, yhigh):
+                yval = yvals[yi]
+                f[xi][yi] += weight * dist.pdf([xval, yval])
+
+    title = ""
+    if proto.HasField("title"):
+        title = proto.title
+
+    pyplot.title(title)
+
+    ax = pyplot.axes(projection='3d')
+    ax.plot_surface(xx, yy, f,
+                    cmap='viridis', edgecolor='none')
 
 
 def gen_histograms(data: str):
@@ -161,6 +219,7 @@ def prepare_render(histogram: Dict, label: str = "", alpha: float = 1.0):
     pyplot.fill_between(
             bins.repeat(2)[1:-1], heights.repeat(2),
             color=color, alpha=alpha, label=label)
+    pyplot.legend()
 
 def next_frame(i, hist_generator):
     global color_index
@@ -228,7 +287,6 @@ if __name__ == "__main__":
             else:
                 raise FileNotFoundError(f"Unable to find file '{args.proto}'")
 
-        #print(help(DynamicDensity_pb2.DynamicDensity.ParseFromString))
         with open(path, "rb") as proto_in:
             serialized = proto_in.read()
 
@@ -243,9 +301,11 @@ if __name__ == "__main__":
             label = hist.get("label", "")
             prepare_render(hist, label=label, alpha=1.0)
         else:
-            prepare_render_dkde(ddens.dynamic_kde)
+            if ddens.dynamic_kde.kernels[0].HasField("covariance"):
+                prepare_render_dkde_2d(ddens.dynamic_kde)
+            else:
+                prepare_render_dkde(ddens.dynamic_kde)
 
-        pyplot.legend()
         pyplot.show()
     else:
         parser.print_help()

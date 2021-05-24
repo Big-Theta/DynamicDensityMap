@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2020 Logan Evans
+// Copyright (c) 2021 Logan Evans
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -214,6 +214,7 @@ class DynamicKDE2D {
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
+        split_threshold_(0.0),
         insertion_buffer_(/*buffer_size=*/2 * refresh_interval) {
     kernels_.reserve(num_kernels + 2);
     kernels_.resize(num_kernels);
@@ -243,18 +244,6 @@ class DynamicKDE2D {
     flush(&flush_it);
     return total_count_;
   }
-
-  //double getMean() {
-  //  auto flush_it = insertion_buffer_.lockedIterator();
-  //  flush(&flush_it);
-
-  //  double acc = 0.0;
-  //  for (const auto& kernel : kernels_) {
-  //    acc += kernel.mean() * kernel.count();
-  //  }
-
-  //  return acc / total_count_;
-  //}
 
   std::string debugString() {
     auto flush_it = insertion_buffer_.lockedIterator();
@@ -312,12 +301,13 @@ class DynamicKDE2D {
   uint64_t generation_;
   uint64_t refresh_generation_;
   double total_count_;
+  double split_threshold_;
 
   InsertionBuffer<std::pair<double, double>> insertion_buffer_;
   std::vector<Kernel2D> kernels_;
   std::vector<double> decay_factors_;
 
-  double splitThreshold() const { return 2 * total_count_ / getNumKernels(); }
+  double splitThreshold() const { return split_threshold_; }
 
   void flush(FlushIterator<std::pair<double, double>>* flush_it) {
     for (; *flush_it; ++(*flush_it)) {
@@ -327,7 +317,7 @@ class DynamicKDE2D {
   }
 
   void flushValue(const std::pair<double, double>& val) {
-    static constexpr size_t N = 3;
+    static constexpr size_t N = 4;
     std::vector<size_t> best_kxs;
     best_kxs.resize(N);
     double best_distances[N];
@@ -397,11 +387,25 @@ class DynamicKDE2D {
       return;
     }
 
+    double min_count = std::numeric_limits<double>::max();
+    double max_count = 0.0;
     total_count_ = 0.0;
     for (size_t kx = 0; kx < kernels_.size(); kx++) {
       kernels_[kx].decay(decay_factor(kernels_[kx].generation()), generation_);
       total_count_ += kernels_[kx].count();
+      if (kernels_[kx].count() < min_count) {
+        min_count = kernels_[kx].count();
+      }
+      if (kernels_[kx].count() > max_count) {
+        max_count = kernels_[kx].count();
+      }
     }
+    if (min_count * 4 < max_count) {
+      split_threshold_ = max_count;
+    } else {
+      split_threshold_ = 2 * total_count_ / getNumKernels();
+    }
+
     refresh_generation_ = generation_;
   }
 
@@ -435,11 +439,6 @@ class DynamicKDE2D {
 
     double dx = kernels_[best_kx[0]].mean_x() - kernels_[best_kx[1]].mean_x();
     double dy = kernels_[best_kx[0]].mean_y() - kernels_[best_kx[1]].mean_y();
-    printf("merging\n\t%s\n\t%s\n\tsum: %lf, dist: %lf\n",
-           kernels_[best_kx[0]].debugString().c_str(),
-           kernels_[best_kx[1]].debugString().c_str(),
-           kernels_[best_kx[0]].count() + kernels_[best_kx[1]].count(),
-           sqrt(dx * dx + dy * dy));
 
     kernels_[best_kx[0]] =
         Kernel2D::merge(kernels_[best_kx[0]], kernels_[best_kx[1]]);
