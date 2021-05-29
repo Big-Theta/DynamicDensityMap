@@ -268,6 +268,8 @@ TEST(DynamicHistogramTest, getMean) {
 
 TEST(DynamicHistogramTest, toProto) {
   DynamicHistogram uut(/*max_num_buckets=*/61);
+  uut.set_title("test");
+  uut.set_label("x-value");
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 
@@ -276,10 +278,10 @@ TEST(DynamicHistogramTest, toProto) {
     uut.addValue(norm(gen));
   }
 
-  DensityMap dm = uut.toProto("test", "x-value");
+  DensityMap dm = uut.toProto();
 
-  EXPECT_EQ(dm.dynamic_histogram().title(), "test");
-  EXPECT_EQ(dm.dynamic_histogram().label(), "x-value");
+  EXPECT_EQ(dm.dynamic_histogram().description().title(), "test");
+  EXPECT_EQ(dm.dynamic_histogram().description().labels()[0], "x-value");
   EXPECT_EQ(dm.dynamic_histogram().bounds()[0], uut.getMin());
   EXPECT_EQ(
       dm.dynamic_histogram().bounds()[dm.dynamic_histogram().bounds_size() - 1],

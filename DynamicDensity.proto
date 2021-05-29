@@ -1,16 +1,44 @@
-syntax = "proto2";
+syntax = "proto3";
 
 package dynamic_density;
 
 import "google/protobuf/timestamp.proto";
 
+service DynamicDensityService {
+  rpc ListDensityMaps (ListDensityMapsParams) returns (ListDensityMapsResult) {}
+  rpc GetDensityMap (DensityMapIdentifier) returns (DensityMap) {}
+  rpc SetDensityMapOptions (DensityMapDescription) returns (DensityMap) {}
+}
+
+message DensityMapIdentifier {
+  int32 identity = 1;
+}
+
+message DensityMapDescription {
+  enum Type {
+    HISTOGRAM = 0;
+    KDE = 1;
+    KDE2D = 2;
+  }
+
+  DensityMapIdentifier identifier = 1;
+  string title = 2;
+  repeated string labels = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  double decay_rate = 5;
+  Type type = 6;
+}
+
+message ListDensityMapsParams {}
+
+message ListDensityMapsResult {
+  repeated DensityMapDescription desriptions = 1;
+}
+
 message DynamicHistogram {
-  optional string title = 1;
-  optional string label = 2;
-  optional google.protobuf.Timestamp timestamp = 3;
-  optional double decay_rate = 4;
-  repeated double bounds = 5;
-  repeated double counts = 6;
+  DensityMapDescription description = 1;
+  repeated double bounds = 2;
+  repeated double counts = 3;
 }
 
 message DynamicKDE {
@@ -20,15 +48,12 @@ message DynamicKDE {
   message Kernel {
     repeated double coord = 1;
     repeated double variance = 2;
-    optional double covariance = 3;
-    optional double count = 4;
+    double covariance = 3;
+    double count = 4;
   }
 
-  optional string title = 1;
-  repeated string label = 2;
-  optional google.protobuf.Timestamp timestamp = 3;
-  optional double decay_rate = 4;
-  repeated Kernel kernels = 5;
+  DensityMapDescription description = 1;
+  repeated Kernel kernels = 2;
 }
 
 message DensityMap {

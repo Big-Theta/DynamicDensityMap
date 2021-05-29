@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2020 Logan Evans
+// Copyright (c) 2021 Logan Evans
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "DynamicDensity.pb.h"
+#include "cpp/DensityMapDescription.h"
 #include "cpp/InsertionBuffer.h"
 
 namespace dhist {
@@ -66,9 +67,11 @@ class Bucket {
 class DynamicHistogram {
  public:
   DynamicHistogram(size_t num_buckets, double decay_rate = 0.0,
-                   size_t refresh_interval = 512)
-      : decay_rate_(decay_rate),
-        refresh_interval_(refresh_interval),
+                   size_t refresh_interval = 512, int32_t identity = 0)
+      : refresh_interval_(refresh_interval),
+        description_(/*type=*/Description::MapType::HISTOGRAM,
+                     /*decay_rate=*/decay_rate,
+                     /*identity=*/identity),
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
@@ -78,12 +81,12 @@ class DynamicHistogram {
     counts_.resize(num_buckets);
     bucket_generation_.resize(num_buckets);
 
-    if (decay_rate_ != 0.0) {
+    if (decay_rate != 0.0) {
       decay_factors_.resize(refresh_interval_);
       double decay = 1.0;
       for (size_t i = 0; i < refresh_interval_; i++) {
         decay_factors_[i] = decay;
-        decay *= 1.0 - decay_rate_;
+        decay *= 1.0 - decay_rate;
       }
     }
   }
@@ -271,16 +274,16 @@ class DynamicHistogram {
     return s;
   }
 
-  std::string json(std::string title = "", std::string label = "") {
+  std::string json() {
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
 
     std::string s("{\n");
-    if (!title.empty()) {
-      s += "  \"title\": \"" + title + "\",\n";
+    if (!description_.title().empty()) {
+      s += "  \"title\": \"" + description_.title() + "\",\n";
     }
-    if (!label.empty()) {
-      s += "  \"label\": \"" + label + "\",\n";
+    if (!description_.labels().empty()) {
+      s += "  \"label\": \"" + description_.labels()[0] + "\",\n";
     }
     s += "  \"bounds\": [" + std::to_string(getMin()) + ", ";
     for (size_t i = 0; i + 1 < ubounds_.size(); i++) {
@@ -296,24 +299,35 @@ class DynamicHistogram {
     return s;
   }
 
-  DensityMap toProto(std::string title = "", std::string label = "") {
+  std::string title() const { return description_.title(); }
+  void set_title(std::string title) {
+    description_.set_title(title);
+  }
+
+  std::string label() const { 
+    if (description_.labels().empty()) {
+      return "";
+    }
+    return description_.labels()[0];
+  }
+  void set_label(std::string label) {
+    description_.set_labels({label});
+  }
+
+  double decay_rate() const {
+    return description_.decay_rate();
+  }
+
+  void set_decay_rate(double decay_rate) {
+    description_.set_decay_rate(decay_rate);
+  }
+
+  DensityMap toProto() {
     DensityMap dm;
     auto *dhist = dm.mutable_dynamic_histogram();
 
-    if (!title.empty()) {
-      dhist->set_title(title);
-    }
-
-    if (!label.empty()) {
-      dhist->set_label(label);
-    }
-
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    dhist->mutable_timestamp()->set_seconds(tv.tv_sec);
-    dhist->mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
-
-    dhist->set_decay_rate(decay_rate_);
+    auto *desc = dhist->mutable_description();
+    description_.toProto(desc);
 
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
@@ -332,8 +346,9 @@ class DynamicHistogram {
   }
 
  protected:
-  const double decay_rate_;
   const size_t refresh_interval_;
+
+  Description description_;
 
   uint64_t generation_;
   uint64_t refresh_generation_;
@@ -367,8 +382,8 @@ class DynamicHistogram {
     // shift_quantiles(val);
     size_t bx = insertValue(val);
 
-    if (decay_rate_ != 0.0) {
-      total_count_ = total_count_ * (1.0 - decay_rate_) + 1.0;
+    if (decay_rate() != 0.0) {
+      total_count_ = total_count_ * (1.0 - decay_rate()) + 1.0;
     } else {
       total_count_ = generation_;
     }
@@ -382,7 +397,7 @@ class DynamicHistogram {
     }
 
     refresh();
-    if (decay_rate_ != 0.0) {
+    if (decay_rate() != 0.0) {
       for (size_t i = 0; i < bucket_generation_.size(); i++) {
         assert(bucket_generation_[i] == generation_);
       }
@@ -395,7 +410,7 @@ class DynamicHistogram {
   double splitThreshold() const { return 2 * total_count_ / getNumBuckets(); }
 
   double countAfterDecay(double original, uint64_t generations) {
-    if (decay_rate_ == 0.0) {
+    if (decay_rate() == 0.0) {
       return original;
     }
     // This invariant should be maintained by addValue calling refresh()
@@ -405,7 +420,7 @@ class DynamicHistogram {
   }
 
   void decay(size_t bx) {
-    if (decay_rate_ == 0.0) {
+    if (decay_rate() == 0.0) {
       return;
     }
     counts_[bx] =

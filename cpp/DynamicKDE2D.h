@@ -35,10 +35,13 @@
 #include <vector>
 
 #include "DynamicDensity.pb.h"
+#include "cpp/DensityMapDescription.h"
 #include "cpp/InsertionBuffer.h"
 
 namespace dhist {
 
+using ::dynamic_density::DensityMapIdentifier;
+using ::dynamic_density::DensityMapDescription;
 using ::dynamic_density::DensityMap;
 using ::google::protobuf::Timestamp;
 
@@ -208,9 +211,11 @@ class Kernel2D {
 class DynamicKDE2D {
  public:
   DynamicKDE2D(size_t num_kernels, double decay_rate = 0.0,
-               size_t refresh_interval = 512)
-      : decay_rate_(decay_rate),
-        refresh_interval_(refresh_interval),
+               size_t refresh_interval = 512, int32_t identity = 0)
+      : refresh_interval_(refresh_interval),
+        description_(/*type=*/Description::MapType::KDE2D,
+                     /*decay_rate=*/decay_rate,
+                     /*identity=*/identity),
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
@@ -219,19 +224,19 @@ class DynamicKDE2D {
     kernels_.reserve(num_kernels + 2);
     kernels_.resize(num_kernels);
 
-    if (decay_rate_ != 0.0) {
+    if (decay_rate != 0.0) {
       decay_factors_.resize(refresh_interval_);
       double decay = 1.0;
       for (size_t i = 0; i < refresh_interval_; i++) {
         decay_factors_[i] = decay;
-        decay *= 1.0 - decay_rate_;
+        decay *= 1.0 - decay_rate;
       }
     }
   }
 
   void addValue(double x, double y) {
     size_t unflushed = insertion_buffer_.addValue(std::make_pair(x, y));
-    if (unflushed >= refresh_interval_) {
+    if (2 * unflushed >= refresh_interval_) {
       auto flush_it = insertion_buffer_.lockedIterator();
       flush(&flush_it);
     }
@@ -267,24 +272,38 @@ class DynamicKDE2D {
     return "";
   }
 
-  DensityMap toProto(std::string title = "", std::string label = "") {
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
+  std::string title() const { return description_.title(); }
+  void set_title(std::string title) {
+    description_.set_title(title);
+  }
 
+  std::string label() const { 
+    if (description_.labels().empty()) {
+      return "";
+    }
+    return description_.labels()[0];
+  }
+  void set_label(std::string label) {
+    description_.set_labels({label});
+  }
+
+  double decay_rate() const {
+    return description_.decay_rate();
+  }
+
+  void set_decay_rate(double decay_rate) {
+    description_.set_decay_rate(decay_rate);
+  }
+
+  DensityMap toProto() {
     DensityMap dm;
     auto* dkde = dm.mutable_dynamic_kde();
 
-    if (!title.empty()) {
-      dkde->set_title(title);
-    }
+    auto *desc = dkde->mutable_description();
+    description_.toProto(desc);
 
-    if (!label.empty()) {
-      dkde->add_label(label);
-    }
-
-    // dkde->set_timestamp(google::protobuf::util::GetCurrentTime());
-
-    dkde->set_decay_rate(decay_rate_);
+    auto flush_it = insertion_buffer_.lockedIterator();
+    flush(&flush_it);
 
     for (const auto& kernel : kernels_) {
       ::dynamic_density::DynamicKDE::Kernel* k_proto = dkde->add_kernels();
@@ -295,8 +314,9 @@ class DynamicKDE2D {
   }
 
  private:
-  const double decay_rate_;
   const size_t refresh_interval_;
+
+  Description description_;
 
   uint64_t generation_;
   uint64_t refresh_generation_;
@@ -366,15 +386,15 @@ class DynamicKDE2D {
       merge();
     }
 
-    if (decay_rate_ != 0.0) {
-      total_count_ = total_count_ * (1.0 - decay_rate_) + 1.0;
+    if (decay_rate() != 0.0) {
+      total_count_ = total_count_ * (1.0 - decay_rate()) + 1.0;
     } else {
       total_count_ = generation_;
     }
   }
 
   double decay_factor(uint64_t kernel_generation) const {
-    if (decay_rate_ == 0.0) {
+    if (decay_rate() == 0.0) {
       return 1.0;
     }
     uint64_t generations = generation_ - kernel_generation;
@@ -392,12 +412,13 @@ class DynamicKDE2D {
     total_count_ = 0.0;
     for (size_t kx = 0; kx < kernels_.size(); kx++) {
       kernels_[kx].decay(decay_factor(kernels_[kx].generation()), generation_);
-      total_count_ += kernels_[kx].count();
-      if (kernels_[kx].count() < min_count) {
-        min_count = kernels_[kx].count();
+      double count = kernels_[kx].count();
+      total_count_ += count;
+      if (count < min_count) {
+        min_count = count;
       }
-      if (kernels_[kx].count() > max_count) {
-        max_count = kernels_[kx].count();
+      if (count > max_count) {
+        max_count = count;
       }
     }
     if (min_count * 4 < max_count) {
@@ -436,9 +457,6 @@ class DynamicKDE2D {
         best_kx[1] = closest_kx;
       }
     }
-
-    double dx = kernels_[best_kx[0]].mean_x() - kernels_[best_kx[1]].mean_x();
-    double dy = kernels_[best_kx[0]].mean_y() - kernels_[best_kx[1]].mean_y();
 
     kernels_[best_kx[0]] =
         Kernel2D::merge(kernels_[best_kx[0]], kernels_[best_kx[1]]);

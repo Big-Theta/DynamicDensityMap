@@ -5,9 +5,16 @@ git_repository(
     remote = "https://github.com/protocolbuffers/protobuf",
     tag = "v3.14.0",
 )
-
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 protobuf_deps()
+
+git_repository(
+    name = 'com_github_grpc_grpc',
+    remote = 'https://github.com/grpc/grpc.git',
+    commit = 'a63bfcc5b8c568c736cac55d52046391c239848c',
+)
+load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+grpc_deps()
 
 git_repository(
     name = "benchmark",
