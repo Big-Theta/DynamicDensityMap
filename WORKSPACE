@@ -27,3 +27,6 @@ git_repository(
     remote = "https://github.com/google/googletest",
     branch = "v1.10.x",
 )
+
+load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
+grpc_extra_deps()

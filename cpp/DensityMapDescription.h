@@ -52,6 +52,27 @@ class Description {
         decay_rate_(decay_rate),
         type_(type) {}
 
+  const Identifier& identifier() const { return identifier_; }
+
+  void setFromProto(const DensityMapDescription& proto) {
+    if (type_ == MapType::HISTOGRAM) {
+      assert(proto.type() == DensityMapDescription::HISTOGRAM);
+    } else if (type_ == MapType::KDE) {
+      assert(proto.type() == DensityMapDescription::KDE);
+    } else {
+      assert(proto.type() == DensityMapDescription::KDE2D);
+    }
+
+    title_ = proto.title();
+
+    labels_.clear();
+    for (auto label : proto.labels()) {
+      labels_.push_back(label);
+    }
+
+    decay_rate_ = proto.decay_rate();
+  }
+
   const std::string& title() const { return title_; }
   void set_title(std::string title) { title_ = title; }
 
@@ -85,6 +106,21 @@ class Description {
     } else {
       proto->set_type(DensityMapDescription::KDE2D);
     }
+  }
+
+  static void copyToProto(const DensityMapDescription& from_proto,
+                          DensityMapDescription* to_proto) {
+    DensityMapIdentifier* identifier = to_proto->mutable_identifier();
+    identifier->set_identity(from_proto.identifier().identity());
+    to_proto->set_title(from_proto.title());
+    for (const auto& label : from_proto.labels()) {
+      to_proto->add_labels(label);
+    }
+    to_proto->mutable_timestamp()->set_seconds(
+        from_proto.timestamp().seconds());
+    to_proto->mutable_timestamp()->set_seconds(from_proto.timestamp().nanos());
+    to_proto->set_decay_rate(from_proto.decay_rate());
+    to_proto->set_type(from_proto.type());
   }
 
  private:

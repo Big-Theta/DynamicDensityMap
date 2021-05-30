@@ -265,52 +265,33 @@ class DynamicKDE2D {
     return s;
   }
 
-  std::string json(std::string title = "", std::string label = "") {
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
-
-    return "";
+  const Description& description() const {
+    return description_;
   }
 
-  std::string title() const { return description_.title(); }
-  void set_title(std::string title) {
-    description_.set_title(title);
+  Description* mutable_description() {
+    return &description_;
   }
 
-  std::string label() const { 
-    if (description_.labels().empty()) {
-      return "";
-    }
-    return description_.labels()[0];
-  }
-  void set_label(std::string label) {
-    description_.set_labels({label});
-  }
-
-  double decay_rate() const {
-    return description_.decay_rate();
-  }
-
-  void set_decay_rate(double decay_rate) {
-    description_.set_decay_rate(decay_rate);
-  }
-
-  DensityMap toProto() {
+  DensityMap asProto() {
     DensityMap dm;
-    auto* dkde = dm.mutable_dynamic_kde();
+    toProto(&dm);
+    return dm;
+  }
 
-    auto *desc = dkde->mutable_description();
+  void toProto(DensityMap* proto) {
+    auto* dkde2d = proto->mutable_dynamic_kde();
+
+    auto *desc = dkde2d->mutable_description();
     description_.toProto(desc);
 
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
 
     for (const auto& kernel : kernels_) {
-      ::dynamic_density::DynamicKDE::Kernel* k_proto = dkde->add_kernels();
+      ::dynamic_density::DynamicKDE::Kernel* k_proto = dkde2d->add_kernels();
       kernel.populateProto(k_proto);
     }
-
-    return dm;
   }
 
  private:
@@ -328,6 +309,10 @@ class DynamicKDE2D {
   std::vector<double> decay_factors_;
 
   double splitThreshold() const { return split_threshold_; }
+
+  double decay_rate() const {
+    return description_.decay_rate();
+  }
 
   void flush(FlushIterator<std::pair<double, double>>* flush_it) {
     for (; *flush_it; ++(*flush_it)) {

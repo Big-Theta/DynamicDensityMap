@@ -1,5 +1,8 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_test", "cc_proto_library")
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+
+package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "density_map_description",
@@ -11,7 +14,6 @@ cc_library(
     copts = [
         "-std=c++17",
     ],
-    visibility = ["//visibility:public"],
 )
 
 cc_library(
@@ -26,7 +28,6 @@ cc_library(
     copts = [
         "-std=c++17",
     ],
-    visibility = ["//visibility:public"],
 )
 
 cc_library(
@@ -35,7 +36,6 @@ cc_library(
     copts = [
         "-std=c++17",
     ],
-    visibility = ["//visibility:private"],
 )
 
 cc_test(
@@ -65,7 +65,6 @@ cc_library(
     copts = [
         "-std=c++17",
     ],
-    visibility = ["//visibility:public"],
 )
 
 cc_test(
@@ -94,7 +93,6 @@ cc_library(
     copts = [
         "-std=c++17",
     ],
-    visibility = ["//visibility:public"],
 )
 
 cc_test(
@@ -147,6 +145,15 @@ py_proto_library(
     deps = ["@com_google_protobuf//:protobuf_python"],
 )
 
+cc_grpc_library(
+    name = "dynamic_density_grpc",
+    srcs = [":dynamic_density_proto"],
+    grpc_only = True,
+    deps = [
+        ":dynamic_density_cc_proto",
+    ],
+)
+
 py_binary(
     name = "show_histogram",
     srcs = ["show_histogram.py"],
@@ -177,21 +184,27 @@ cc_library(
     name = "density_map_server",
     srcs = ["cpp/DensityMapServer.h"],
     deps = [
+        ":density_map_description",
+        ":dynamic_density_cc_proto",
+        ":dynamic_density_grpc",
         ":dynamic_histogram",
         ":dynamic_kde",
         ":dynamic_kde_2d",
         "@com_github_grpc_grpc//:grpc++",
+        "@com_github_grpc_grpc//:grpc++_reflection",
     ],
     copts = [
         "-std=c++17",
     ],
-    visibility = ["//visibility:public"],
 )
 
 cc_binary(
     name = "run_malloc",
     srcs = ["cpp/run_malloc.cpp"],
-    deps = [":dynamic_kde_2d"],
+    deps = [
+        ":density_map_server",
+        ":dynamic_kde_2d",
+    ],
     copts = [
         "-std=c++17",
     ],

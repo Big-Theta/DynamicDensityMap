@@ -279,11 +279,11 @@ class DynamicHistogram {
     flush(&flush_it);
 
     std::string s("{\n");
-    if (!description_.title().empty()) {
-      s += "  \"title\": \"" + description_.title() + "\",\n";
+    if (!description().title().empty()) {
+      s += "  \"title\": \"" + description().title() + "\",\n";
     }
-    if (!description_.labels().empty()) {
-      s += "  \"label\": \"" + description_.labels()[0] + "\",\n";
+    if (!description().labels().empty()) {
+      s += "  \"label\": \"" + description().labels()[0] + "\",\n";
     }
     s += "  \"bounds\": [" + std::to_string(getMin()) + ", ";
     for (size_t i = 0; i + 1 < ubounds_.size(); i++) {
@@ -299,35 +299,25 @@ class DynamicHistogram {
     return s;
   }
 
-  std::string title() const { return description_.title(); }
-  void set_title(std::string title) {
-    description_.set_title(title);
+  const Description& description() const {
+    return description_;
   }
 
-  std::string label() const { 
-    if (description_.labels().empty()) {
-      return "";
-    }
-    return description_.labels()[0];
-  }
-  void set_label(std::string label) {
-    description_.set_labels({label});
+  Description* mutable_description() {
+    return &description_;
   }
 
-  double decay_rate() const {
-    return description_.decay_rate();
-  }
-
-  void set_decay_rate(double decay_rate) {
-    description_.set_decay_rate(decay_rate);
-  }
-
-  DensityMap toProto() {
+  DensityMap asProto() {
     DensityMap dm;
-    auto *dhist = dm.mutable_dynamic_histogram();
+    toProto(&dm);
+    return dm;
+  }
+
+  void toProto(DensityMap* proto) {
+    auto *dhist = proto->mutable_dynamic_histogram();
 
     auto *desc = dhist->mutable_description();
-    description_.toProto(desc);
+    description().toProto(desc);
 
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
@@ -341,8 +331,6 @@ class DynamicHistogram {
     for (size_t i = 0; i < counts_.size(); i++) {
       dhist->add_counts(counts_[i]);
     }
-
-    return dm;
   }
 
  protected:
@@ -365,6 +353,10 @@ class DynamicHistogram {
   std::vector<double> quantiles_;
   std::vector<double> quantile_locations_;
   std::vector<double> decay_factors_;
+
+  double decay_rate() const {
+    return description().decay_rate();
+  }
 
   void flush(FlushIterator<double>* flush_it) {
     for (; *flush_it; ++(*flush_it)) {

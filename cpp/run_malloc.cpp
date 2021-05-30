@@ -1,6 +1,7 @@
 #include <cmath>
 #include <random>
 
+#include "cpp/DensityMapServer.h"
 #include "cpp/DynamicKDE2D.h"
 
 using dhist::DynamicKDE2D;
@@ -41,7 +42,7 @@ int main() {
     }
 
     if (i % 100000 == 0) {
-      printf("%s\n", dynamic_kde_2d.toProto().DebugString().c_str());
+      printf("%s\n", dynamic_kde_2d.asProto().DebugString().c_str());
     }
   }
 }

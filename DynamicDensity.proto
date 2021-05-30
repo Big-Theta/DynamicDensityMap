@@ -32,7 +32,7 @@ message DensityMapDescription {
 message ListDensityMapsParams {}
 
 message ListDensityMapsResult {
-  repeated DensityMapDescription desriptions = 1;
+  repeated DensityMapDescription descriptions = 1;
 }
 
 message DynamicHistogram {

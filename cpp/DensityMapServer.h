@@ -23,7 +23,9 @@
 #pragma once
 
 #include <grpc/support/log.h>
+#include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/grpcpp.h>
+#include <grpcpp/health_check_service_interface.h>
 
 #include <iostream>
 #include <memory>
@@ -32,7 +34,11 @@
 #include <thread>
 #include <vector>
 
+#include "DynamicDensity.grpc.pb.h"
 #include "DynamicDensity.pb.h"
+#include "cpp/DynamicHistogram.h"
+#include "cpp/DynamicKDE.h"
+#include "cpp/DynamicKDE2D.h"
 
 namespace dhist {
 
@@ -42,15 +48,6 @@ using grpc::ServerBuilder;
 using grpc::ServerCompletionQueue;
 using grpc::ServerContext;
 using grpc::Status;
-
-using dhist::DynamicDensityService;
-using dhist::DensityMapIdentifier;
-using dhist::DensityMapDescription;
-using dhist::ListDensityMapsParams;
-using dhist::ListDensityMapsResult;
-using dhist::DynamicHistogram;
-using dhist::DynamicKDE;
-using dhist::DensityMap;
 
 class DensityMapsRegistry {
  public:
@@ -65,67 +62,132 @@ class DensityMapsRegistry {
   DynamicHistogram* registerDynamicHistogram(size_t num_buckets,
                                              double decay_rate = 0.0,
                                              size_t refresh_interval = 512) {
-    std::scoped_lock(mutex_);
-    dhists_.emplace_back(
-        DynamicHistogram(num_buckets, decay_rate, refresh_interval));
-    return &dhists_.back();
+    std::scoped_lock l(mutex_);
+    dhists_.emplace_back(std::make_unique<DynamicHistogram>(
+        num_buckets, decay_rate, refresh_interval, -1));
+    return dhists_.back().get();
   }
 
   DynamicKDE* registerDynamicKDE(size_t num_buckets, double decay_rate = 0.0,
                                  size_t refresh_interval = 512) {
-    std::scoped_lock(mutex_);
-    dkdes_.emplace_back(DynamicKDE(num_buckets, decay_rate, refresh_interval));
-    return &dkdes_.back();
+    std::scoped_lock l(mutex_);
+    dkdes_.emplace_back(std::make_unique<DynamicKDE>(num_buckets, decay_rate,
+                                                     refresh_interval, -1));
+    return dkdes_.back().get();
   }
 
   DynamicKDE2D* registerDynamicKDE2D(size_t num_buckets,
                                      double decay_rate = 0.0,
                                      size_t refresh_interval = 512) {
-    std::scoped_lock(mutex_);
-    dkdes_.emplace_back(
-        DynamicKDE2D(num_buckets, decay_rate, refresh_interval));
-    return &dkde2ds_.back();
+    std::scoped_lock l(mutex_);
+    dkde2ds_.emplace_back(std::make_unique<DynamicKDE2D>(
+        num_buckets, decay_rate, refresh_interval, -1));
+    return dkde2ds_.back().get();
   }
 
-  void ListDensityMaps(const ListDensityMapsParams* request,
-                       ListDensityMapsResult* reply) {
+  void ListDensityMaps(const ::dynamic_density::ListDensityMapsParams* request,
+                       ::dynamic_density::ListDensityMapsResult* reply) {
+    for (auto& hist : dhists_) {
+      Description::copyToProto(
+          hist->asProto().dynamic_histogram().description(),
+          reply->add_descriptions());
+    }
+    for (auto& kde : dkdes_) {
+      Description::copyToProto(kde->asProto().dynamic_histogram().description(),
+                               reply->add_descriptions());
+    }
+    for (auto& kde2d : dkde2ds_) {
+      Description::copyToProto(
+          kde2d->asProto().dynamic_histogram().description(),
+          reply->add_descriptions());
+    }
+  }
+
+  Status GetDensityMap(const DensityMapIdentifier* request, DensityMap* reply) {
+    int32_t id = request->identity();
+    for (auto& hist : dhists_) {
+      if (hist->description().identifier().identifier() == id) {
+        hist->toProto(reply);
+        return Status::OK;
+      }
+    }
+    for (auto& kde : dkdes_) {
+      if (kde->description().identifier().identifier() == id) {
+        kde->toProto(reply);
+        return Status::OK;
+      }
+    }
+    for (auto& kde2d : dkde2ds_) {
+      if (kde2d->description().identifier().identifier() == id) {
+        kde2d->toProto(reply);
+        return Status::OK;
+      }
+    }
+    return Status(
+        grpc::StatusCode::UNKNOWN,
+        "Unknown identifier: '" + std::to_string(id) + "'");
+  }
+
+  Status SetDensityMapOptions(const DensityMapDescription* request,
+                              DensityMap* reply) {
+    int32_t id = request->identifier().identity();
+    for (auto& hist : dhists_) {
+      if (hist->description().identifier().identifier() == id) {
+        hist->mutable_description()->setFromProto(*request);
+        hist->toProto(reply);
+        return Status::OK;
+      }
+    }
+    for (auto& kde : dkdes_) {
+      if (kde->description().identifier().identifier() == id) {
+        kde->mutable_description()->setFromProto(*request);
+        kde->toProto(reply);
+        return Status::OK;
+      }
+    }
+    for (auto& kde2d : dkde2ds_) {
+      if (kde2d->description().identifier().identifier() == id) {
+        kde2d->mutable_description()->setFromProto(*request);
+        kde2d->toProto(reply);
+        return Status::OK;
+      }
+    }
+    return Status(
+        grpc::StatusCode::UNKNOWN,
+        "Unknown identifier: '" + std::to_string(id) + "'");
   }
 
  private:
   DensityMapsRegistry() {}
 
   std::mutex mutex_;
-  std::vector<DynamicHistogram> dhists_;
-  std::vector<DynamicKDE> dkdes_;
-  std::vector<DynamicKDE2D> dkde2ds_;
+  std::vector<std::unique_ptr<DynamicHistogram>> dhists_;
+  std::vector<std::unique_ptr<DynamicKDE>> dkdes_;
+  std::vector<std::unique_ptr<DynamicKDE2D>> dkde2ds_;
 };
 
 // Logic and data behind the server's behavior.
-class DynamicDensityServiceImpl final : public DynamicDensityService::Service {
-  Status ListDensityMaps(ServerContext* context,
-                         const ListDensityMapsParams* request,
-                         ListDensityMapsResult* reply) override {
-    auto* description = reply->add_descriptions();
-
-    std::string prefix("Hello ");
-    reply->set_message(prefix + request->name());
+class DynamicDensityServiceImpl final
+    : public ::dynamic_density::DynamicDensityService::Service {
+  Status ListDensityMaps(
+      ServerContext* context,
+      const ::dynamic_density::ListDensityMapsParams* request,
+      ::dynamic_density::ListDensityMapsResult* reply) override {
+    DensityMapsRegistry::getInstance().ListDensityMaps(request, reply);
     return Status::OK;
   }
 
   Status GetDensityMap(ServerContext* context,
                        const DensityMapIdentifier* request,
                        DensityMap* reply) override {
-    std::string prefix("Hello ");
-    reply->set_message(prefix + request->name());
-    return Status::OK;
+    return DensityMapsRegistry::getInstance().GetDensityMap(request, reply);
   }
 
   Status SetDensityMapOptions(ServerContext* context,
                               const DensityMapDescription* request,
                               DensityMap* reply) override {
-    std::string prefix("Hello ");
-    reply->set_message(prefix + request->name());
-    return Status::OK;
+    return DensityMapsRegistry::getInstance().SetDensityMapOptions(request,
+                                                                   reply);
   }
 };
 
@@ -150,8 +212,7 @@ void RunServer() {
   server->Wait();
 }
 
-
-//int main(int argc, char** argv) {
+// int main(int argc, char** argv) {
 //  ServerImpl server;
 //  server.Run();
 //

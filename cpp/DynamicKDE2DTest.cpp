@@ -120,13 +120,13 @@ TEST(DynamicKDE2DTest, addNoDecay) {
     ASSERT_EQ(uut.computeTotalCount(), i + 1);
   }
 
-  printf("??? %s\n", uut.toProto().DebugString().c_str());
+  printf("??? %s\n", uut.asProto().DebugString().c_str());
 
   EXPECT_EQ(uut.computeTotalCount(), kNumValues);
 
   std::ofstream myfile("/tmp/DynamicKDE2D.pbuf");
   ASSERT_TRUE(myfile.is_open());
-  ASSERT_TRUE(uut.toProto().SerializeToOstream(&myfile));
+  ASSERT_TRUE(uut.asProto().SerializeToOstream(&myfile));
   myfile.close();
 }
 

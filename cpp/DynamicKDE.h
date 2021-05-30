@@ -272,39 +272,22 @@ class DynamicKDE {
     return s;
   }
 
-  std::string json(std::string title = "", std::string label = "") {
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
-
-    return "";
+  const Description& description() const {
+    return description_;
   }
 
-  std::string title() const { return description_.title(); }
-  void set_title(std::string title) {
-    description_.set_title(title);
+  Description* mutable_description() {
+    return &description_;
   }
 
-  std::string label() const { 
-    if (description_.labels().empty()) {
-      return "";
-    }
-    return description_.labels()[0];
-  }
-  void set_label(std::string label) {
-    description_.set_labels({label});
-  }
-
-  double decay_rate() const {
-    return description_.decay_rate();
-  }
-
-  void set_decay_rate(double decay_rate) {
-    description_.set_decay_rate(decay_rate);
-  }
-
-  DensityMap toProto() {
+  DensityMap asProto() {
     DensityMap dm;
-    auto* dkde = dm.mutable_dynamic_kde();
+    toProto(&dm);
+    return dm;
+  }
+
+  void toProto(DensityMap* proto) {
+    auto* dkde = proto->mutable_dynamic_kde();
 
     auto *desc = dkde->mutable_description();
     description_.toProto(desc);
@@ -316,8 +299,6 @@ class DynamicKDE {
       ::dynamic_density::DynamicKDE::Kernel* k_proto = dkde->add_kernels();
       kernel.populateProto(k_proto);
     }
-
-    return dm;
   }
 
  private:
@@ -335,6 +316,10 @@ class DynamicKDE {
   std::vector<double> decay_factors_;
 
   double splitThreshold() const { return split_threshold_; }
+
+  double decay_rate() const {
+    return description_.decay_rate();
+  }
 
   void flush(FlushIterator<double>* flush_it) {
     for (; *flush_it; ++(*flush_it)) {

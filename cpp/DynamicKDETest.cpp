@@ -136,10 +136,10 @@ TEST(DynamicKDETest, addWithDecay) {
   EXPECT_NEAR(uut.getMean(), 0.0, 1e-1) << uut.debugString();
 }
 
-TEST(DynamicKDETest, toProto) {
+TEST(DynamicKDETest, asProto) {
   DynamicKDE uut(/*num_kernels=*/61);
-  uut.set_title("test");
-  uut.set_label("x-value");
+  uut.mutable_description()->set_title("test");
+  uut.mutable_description()->set_labels({"x-value"});
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 
@@ -148,7 +148,7 @@ TEST(DynamicKDETest, toProto) {
     uut.addValue(norm(gen));
   }
 
-  DensityMap dm = uut.toProto();
+  DensityMap dm = uut.asProto();
 
   EXPECT_EQ(dm.dynamic_kde().description().title(), "test");
   EXPECT_EQ(dm.dynamic_kde().description().labels()[0], "x-value");
