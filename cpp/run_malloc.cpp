@@ -13,11 +13,15 @@ uint64_t rdtsc(){
 }
 
 int main() {
+  dhist::StartDensityMapServer();
+
   static constexpr size_t kNumPtrs = 4096;
   void* ptrs[kNumPtrs];
   memset(ptrs, 0, sizeof(void*) * kNumPtrs);
 
-  DynamicKDE2D dynamic_kde_2d(/*num_kernels=*/200, /*decay_rate=*/0.00001);
+  auto* dynamic_kde_2d =
+      dhist::DensityMapsRegistry::getInstance().registerDynamicKDE2D(
+          /*num_kernels=*/200, /*decay_rate=*/0.00001);
 
   std::default_random_engine gen;
   std::uniform_int_distribution<size_t> ptr_idx_dist(0, kNumPtrs - 1);
@@ -38,11 +42,11 @@ int main() {
       uint64_t end = rdtsc();
       ptrs[ptr_idx] = ptr;
 
-      dynamic_kde_2d.addValue(log_size, end - begin);
+      dynamic_kde_2d->addValue(log_size, end - begin);
     }
 
     if (i % 100000 == 0) {
-      printf("%s\n", dynamic_kde_2d.asProto().DebugString().c_str());
+      printf("%s\n", dynamic_kde_2d->asProto().DebugString().c_str());
     }
   }
 }

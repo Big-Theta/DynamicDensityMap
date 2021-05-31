@@ -5,9 +5,22 @@ package dynamic_density;
 import "google/protobuf/timestamp.proto";
 
 service DynamicDensityService {
-  rpc ListDensityMaps (ListDensityMapsParams) returns (ListDensityMapsResult) {}
-  rpc GetDensityMap (DensityMapIdentifier) returns (DensityMap) {}
-  rpc SetDensityMapOptions (DensityMapDescription) returns (DensityMap) {}
+  rpc RPCQuery(RPCQueryParams) returns (RPCQueryResult) {}
+}
+
+message RPCQueryParams {
+  oneof request {
+    ListDensityMapsParams list_density_maps_params = 1;
+    DensityMapIdentifier get_map_with_identifier = 2;
+    DensityMapDescription set_density_map_description = 3;
+  }
+}
+
+message RPCQueryResult {
+  oneof result {
+    ListDensityMapsResult list_density_maps_result = 1;
+    DensityMap density_map_result = 2;
+  }
 }
 
 message DensityMapIdentifier {
