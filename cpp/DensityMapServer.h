@@ -64,15 +64,15 @@ class DensityMapsRegistry {
                                              size_t refresh_interval = 512) {
     std::scoped_lock l(mutex_);
     dhists_.emplace_back(std::make_unique<DynamicHistogram>(
-        num_buckets, decay_rate, refresh_interval, -1));
+        num_buckets, decay_rate, refresh_interval, next_identity_++));
     return dhists_.back().get();
   }
 
   DynamicKDE* registerDynamicKDE(size_t num_buckets, double decay_rate = 0.0,
                                  size_t refresh_interval = 512) {
     std::scoped_lock l(mutex_);
-    dkdes_.emplace_back(std::make_unique<DynamicKDE>(num_buckets, decay_rate,
-                                                     refresh_interval, -1));
+    dkdes_.emplace_back(std::make_unique<DynamicKDE>(
+        num_buckets, decay_rate, refresh_interval, next_identity_++));
     return dkdes_.back().get();
   }
 
@@ -81,7 +81,7 @@ class DensityMapsRegistry {
                                      size_t refresh_interval = 512) {
     std::scoped_lock l(mutex_);
     dkde2ds_.emplace_back(std::make_unique<DynamicKDE2D>(
-        num_buckets, decay_rate, refresh_interval, -1));
+        num_buckets, decay_rate, refresh_interval, next_identity_++));
     return dkde2ds_.back().get();
   }
 
@@ -93,12 +93,12 @@ class DensityMapsRegistry {
           reply->add_descriptions());
     }
     for (auto& kde : dkdes_) {
-      Description::copyToProto(kde->asProto().dynamic_histogram().description(),
+      Description::copyToProto(kde->asProto().dynamic_kde().description(),
                                reply->add_descriptions());
     }
     for (auto& kde2d : dkde2ds_) {
       Description::copyToProto(
-          kde2d->asProto().dynamic_histogram().description(),
+          kde2d->asProto().dynamic_kde().description(),
           reply->add_descriptions());
     }
   }
@@ -158,13 +158,14 @@ class DensityMapsRegistry {
   }
 
  private:
-  DensityMapsRegistry() {}
+  DensityMapsRegistry() : next_identity_(1) {}
 
   std::thread server_thread_;
   std::mutex mutex_;
   std::vector<std::unique_ptr<DynamicHistogram>> dhists_;
   std::vector<std::unique_ptr<DynamicKDE>> dkdes_;
   std::vector<std::unique_ptr<DynamicKDE2D>> dkde2ds_;
+  int32_t next_identity_;
 };
 
 // Logic and data behind the server's behavior.

@@ -118,7 +118,7 @@ class Description {
     }
     to_proto->mutable_timestamp()->set_seconds(
         from_proto.timestamp().seconds());
-    to_proto->mutable_timestamp()->set_seconds(from_proto.timestamp().nanos());
+    to_proto->mutable_timestamp()->set_nanos(from_proto.timestamp().nanos());
     to_proto->set_decay_rate(from_proto.decay_rate());
     to_proto->set_type(from_proto.type());
   }

@@ -1,6 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_test", "cc_proto_library")
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_grpc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -146,7 +147,7 @@ py_proto_library(
 )
 
 cc_grpc_library(
-    name = "dynamic_density_grpc",
+    name = "dynamic_density_cc_grpc",
     srcs = [":dynamic_density_proto"],
     grpc_only = True,
     deps = [
@@ -154,12 +155,22 @@ cc_grpc_library(
     ],
 )
 
+py_grpc_library(
+    name = "dynamic_density_py_grpc",
+    srcs = [":dynamic_density_proto"],
+    deps = [
+        ":dynamic_density_py_proto",
+    ],
+)
+
 py_binary(
     name = "show_histogram",
     srcs = ["show_histogram.py"],
     deps = [
+        ":dynamic_density_py_grpc",
         ":dynamic_density_py_proto",
     ],
+    python_version = "PY3",
 )
 
 cc_library(
@@ -186,7 +197,7 @@ cc_library(
     deps = [
         ":density_map_description",
         ":dynamic_density_cc_proto",
-        ":dynamic_density_grpc",
+        ":dynamic_density_cc_grpc",
         ":dynamic_histogram",
         ":dynamic_kde",
         ":dynamic_kde_2d",

@@ -8,6 +8,8 @@ from typing import Dict, List
 import argparse
 import bisect
 import DynamicDensity_pb2
+import DynamicDensity_pb2_grpc
+import grpc
 import json
 import numpy as np
 import os
@@ -17,6 +19,9 @@ parser = argparse.ArgumentParser(description='Display a dynamic density map.')
 parser.add_argument("--stdin", type=bool, default=False)
 parser.add_argument("--animate", type=bool, default=False)
 parser.add_argument("--proto", type=str, default="")
+parser.add_argument("--server", type=str, default="0.0.0.0:50051")
+parser.add_argument("--list", type=bool, default=False)
+parser.add_argument("--get_map", type=int, default=0)
 args = parser.parse_args()
 
 
@@ -61,9 +66,8 @@ def dhist_to_histogram(proto: DynamicDensity_pb2.DynamicHistogram) -> dict:
         "bounds": proto.bounds,
         "counts": proto.counts,
     }
-    if proto.HasField("title"):
-        hist["title"] = proto.title
-    if proto.HasField("label"):
+    hist["title"] = proto.title
+    if len(proto.label):
         hist["label"] = proto.label
     return hist
 
@@ -83,9 +87,7 @@ def prepare_render_dkde(proto: DynamicDensity_pb2.DynamicKDE,
         for i in range(low, high):
             y_d[i] += dist.pdf(x_d[i]) * weight
 
-    title = ""
-    if proto.HasField("title"):
-        title = proto.title
+    title = proto.title
     label = ""
     if len(proto.label):
         label = proto.label[0]
@@ -114,6 +116,10 @@ def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
         range_y[0] = min(range_y[0], pos_range_y[0])
         range_y[1] = max(range_y[1], pos_range_y[1])
 
+    # XXX
+    range_x = [0, 4]
+    range_y = [0, 1000]
+
     xvals = np.linspace(range_x[0], range_x[1], 100)
     yvals = np.linspace(range_y[0], range_y[1], 100)
     xx, yy = np.meshgrid(xvals, yvals)
@@ -141,15 +147,12 @@ def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
                 yval = yvals[yi]
                 f[xi][yi] += weight * dist.pdf([xval, yval])
 
-    title = ""
-    if proto.HasField("title"):
-        title = proto.title
-
-    pyplot.title(title)
+    pyplot.title(proto.description.title)
 
     ax = pyplot.axes(projection='3d')
     ax.plot_surface(xx, yy, f,
                     cmap='viridis', edgecolor='none')
+    ax.set_zlim(0, 0.0002)
 
 
 def gen_histograms(data: str):
@@ -307,5 +310,43 @@ if __name__ == "__main__":
                 prepare_render_dkde(ddens.dynamic_kde)
 
         pyplot.show()
+    elif args.server:
+        if args.list:
+            request = DynamicDensity_pb2.RPCQueryParams()
+            request.list_density_maps_params.SetInParent()
+        elif args.get_map:
+            request = DynamicDensity_pb2.RPCQueryParams()
+            request.get_map_with_identifier.SetInParent()
+            request.get_map_with_identifier.identity = args.get_map
+        elif args.set_map:
+            assert(False)
+
+        with grpc.insecure_channel(args.server) as channel:
+            response = channel.unary_unary(
+                "/dynamic_density.DynamicDensityService/RPCQuery",
+                request_serializer=
+                    DynamicDensity_pb2.RPCQueryParams.SerializeToString,
+                response_deserializer=
+                    DynamicDensity_pb2.RPCQueryResult.FromString,
+            )(request)
+
+        if response.HasField("list_density_maps_result"):
+            print(response)
+        elif response.HasField("density_map_result"):
+            ddens = response.density_map_result
+            if ddens.HasField("dynamic_histogram"):
+                hist = dhist_to_histogram(ddens.dynamic_histogram)
+                assert(check_histogram(hist))
+
+                pyplot.title(hist.get("title", ""))
+                label = hist.get("label", "")
+                prepare_render(hist, label=label, alpha=1.0)
+            else:
+                if len(ddens.dynamic_kde.kernels[0].coord) == 1:
+                    prepare_render_dkde(ddens.dynamic_kde)
+                else:
+                    prepare_render_dkde_2d(ddens.dynamic_kde)
+
+            pyplot.show()
     else:
         parser.print_help()

@@ -21,12 +21,12 @@ int main() {
 
   auto* dynamic_kde_2d =
       dhist::DensityMapsRegistry::getInstance().registerDynamicKDE2D(
-          /*num_kernels=*/200, /*decay_rate=*/0.00001);
+          /*num_kernels=*/100, /*decay_rate=*/0.00001);
 
   std::default_random_engine gen;
   std::uniform_int_distribution<size_t> ptr_idx_dist(0, kNumPtrs - 1);
   // After taking e^(rand), the value will be between 1B and 1MB.
-  std::uniform_real_distribution log_size_dist(0.0, 14.555);
+  std::uniform_real_distribution log_size_dist(0.0, 13.86294);
 
   for (size_t i = 1; i < 1000000000; i++) {
     size_t ptr_idx = ptr_idx_dist(gen);
@@ -45,9 +45,9 @@ int main() {
       dynamic_kde_2d->addValue(log_size, end - begin);
     }
 
-    if (i % 100000 == 0) {
-      printf("%s\n", dynamic_kde_2d->asProto().DebugString().c_str());
-    }
+    //if (i % 1000000 == 0) {
+    //  printf("%s\n", dynamic_kde_2d->asProto().DebugString().c_str());
+    //}
   }
 }
 
