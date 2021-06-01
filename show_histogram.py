@@ -101,29 +101,45 @@ def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
                            alpha: float = 1.0):
     total = sum([kernel.count for kernel in proto.kernels])
 
-    def range_x_range_y(kernel):
-        range_x = [kernel.coord[0] - 6 * kernel.variance[0],
-                   kernel.coord[0] + 6 * kernel.variance[0]]
-        range_y = [kernel.coord[1] - 6 * kernel.variance[1],
-                   kernel.coord[1] + 6 * kernel.variance[1]]
-        return range_x, range_y
-
-    range_x, range_y = range_x_range_y(proto.kernels[0])
+    range_x = [proto.kernels[0].coord[0], proto.kernels[0].coord[0]]
+    range_y = [proto.kernels[0].coord[1], proto.kernels[0].coord[1]]
     for kernel in proto.kernels:
-        pos_range_x, pos_range_y = range_x_range_y(kernel)
-        range_x[0] = min(range_x[0], pos_range_x[0])
-        range_x[1] = max(range_x[1], pos_range_x[1])
-        range_y[0] = min(range_y[0], pos_range_y[0])
-        range_y[1] = max(range_y[1], pos_range_y[1])
+        if kernel.coord[0] < range_x[0]:
+            range_x[0] = kernel.coord[0]
+        if kernel.coord[0] > range_x[1]:
+            range_x[1] = kernel.coord[0]
+        if kernel.coord[1] < range_y[0]:
+            range_y[0] = kernel.coord[1]
+        if kernel.coord[1] > range_y[1]:
+            range_y[1] = kernel.coord[1]
 
-    # XXX
-    range_x = [0, 4]
-    range_y = [0, 1000]
+    diameter_x = range_x[1] - range_x[0]
+    diameter_y = range_y[1] - range_y[0]
+    range_x = [range_x[0] - 0.05 * diameter_x, range_x[1] + 0.05 * diameter_x]
+    range_y = [range_y[0] - 0.05 * diameter_y, range_y[1] + 0.05 * diameter_y]
 
     xvals = np.linspace(range_x[0], range_x[1], 100)
     yvals = np.linspace(range_y[0], range_y[1], 100)
     xx, yy = np.meshgrid(xvals, yvals)
     f = np.zeros((100, 100))
+
+    memo = {}
+    def memo_or_cdf(dist, r):
+        if (dist, r) not in memo:
+            memo[(dist, r)] = dist.cdf(r)
+        return memo[(dist, r)]
+
+    def volumn_at_coord(dist, x, y, diameter_x, diameter_y):
+        """The cdf provides the volumn up to a point. To pull out a square
+        around a point, we need 4 calls and some additions/subtractions."""
+        upper_left = memo_or_cdf(dist, (x - diameter_x, y))
+        upper_right = memo_or_cdf(dist, (x, y))
+        lower_left = memo_or_cdf(dist, (x - diameter_x, y - diameter_y))
+        lower_right = memo_or_cdf(dist, (x, y - diameter_y))
+        return upper_right - lower_right - upper_left + lower_left
+
+    diameter_x = xvals[1] - xvals[0]
+    diameter_y = yvals[1] - yvals[0]
 
     for kernel in proto.kernels:
         dist = multivariate_normal(
@@ -133,26 +149,32 @@ def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
         weight = kernel.count / total
 
         xlow = bisect.bisect_right(
-                xvals, kernel.coord[0] - 6 * kernel.variance[0])
+                xvals, kernel.coord[0] - 5 * kernel.variance[0])
         xhigh = bisect.bisect_right(
-                xvals, kernel.coord[0] + 6 * kernel.variance[0])
+                xvals, kernel.coord[0] + 5 * kernel.variance[0])
         ylow = bisect.bisect_right(
-                yvals, kernel.coord[1] - 6 * kernel.variance[1])
+                yvals, kernel.coord[1] - 5 * kernel.variance[1])
         yhigh = bisect.bisect_right(
-                yvals, kernel.coord[1] + 6 * kernel.variance[1])
+                yvals, kernel.coord[1] + 5 * kernel.variance[1])
 
         for xi in range(xlow, xhigh):
             xval = xvals[xi]
             for yi in range(ylow, yhigh):
                 yval = yvals[yi]
-                f[xi][yi] += weight * dist.pdf([xval, yval])
-
-    pyplot.title(proto.description.title)
+                f[xi][yi] += (
+                    weight *
+                    volumn_at_coord(dist, xval, yval, diameter_x, diameter_y))
 
     ax = pyplot.axes(projection='3d')
+    pyplot.title(proto.description.title, fontsize=24)
+
+    proto_labels = proto.description.labels
+    if len(proto_labels) >= 1:
+        ax.set_xlabel(proto_labels[0], fontsize=18)
+    if len(proto_labels) >= 2:
+        ax.set_ylabel(proto_labels[1], fontsize=18)
     ax.plot_surface(xx, yy, f,
                     cmap='viridis', edgecolor='none')
-    ax.set_zlim(0, 0.0002)
 
 
 def gen_histograms(data: str):

@@ -22,13 +22,16 @@ int main() {
   auto* dynamic_kde_2d =
       dhist::DensityMapsRegistry::getInstance().registerDynamicKDE2D(
           /*num_kernels=*/100, /*decay_rate=*/0.00001);
+  auto* description = dynamic_kde_2d->mutable_description();
+  description->set_title("malloc");
+  description->set_labels({"log size", "log cycles"});
 
   std::default_random_engine gen;
   std::uniform_int_distribution<size_t> ptr_idx_dist(0, kNumPtrs - 1);
   // After taking e^(rand), the value will be between 1B and 1MB.
   std::uniform_real_distribution log_size_dist(0.0, 13.86294);
 
-  for (size_t i = 1; i < 1000000000; i++) {
+  while (true) {
     size_t ptr_idx = ptr_idx_dist(gen);
     void* ptr = ptrs[ptr_idx];
     if (ptr != nullptr) {
@@ -42,7 +45,7 @@ int main() {
       uint64_t end = rdtsc();
       ptrs[ptr_idx] = ptr;
 
-      dynamic_kde_2d->addValue(log_size, end - begin);
+      dynamic_kde_2d->addValue(log_size, log(end - begin));
     }
 
     //if (i % 1000000 == 0) {
