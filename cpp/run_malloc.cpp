@@ -2,9 +2,9 @@
 #include <random>
 
 #include "cpp/DensityMapServer.h"
+#include "cpp/DynamicHistogram.h"
+#include "cpp/DynamicKDE.h"
 #include "cpp/DynamicKDE2D.h"
-
-using dhist::DynamicKDE2D;
 
 uint64_t rdtsc(){
   unsigned int lo, hi;
@@ -19,12 +19,27 @@ int main() {
   void* ptrs[kNumPtrs];
   memset(ptrs, 0, sizeof(void*) * kNumPtrs);
 
+  dhist::Description* description;
+  auto* dynamic_histogram =
+      dhist::DensityMapsRegistry::getInstance().registerDynamicHistogram(
+          /*num_buckets=*/100, /*decay_rate=*/0.00001);
+  description = dynamic_histogram->mutable_description();
+  description->set_title("malloc");
+  description->set_labels({"log(cycles)"});
+
+  auto* dynamic_kde =
+      dhist::DensityMapsRegistry::getInstance().registerDynamicKDE(
+          /*num_kernels=*/100, /*decay_rate=*/0.00001);
+  description = dynamic_kde->mutable_description();
+  description->set_title("malloc");
+  description->set_labels({"log(cycles)"});
+
   auto* dynamic_kde_2d =
       dhist::DensityMapsRegistry::getInstance().registerDynamicKDE2D(
           /*num_kernels=*/100, /*decay_rate=*/0.00001);
-  auto* description = dynamic_kde_2d->mutable_description();
+  description = dynamic_kde_2d->mutable_description();
   description->set_title("malloc");
-  description->set_labels({"log size", "log cycles"});
+  description->set_labels({"log(size)", "log(cycles)"});
 
   std::default_random_engine gen;
   std::uniform_int_distribution<size_t> ptr_idx_dist(0, kNumPtrs - 1);
@@ -45,12 +60,11 @@ int main() {
       uint64_t end = rdtsc();
       ptrs[ptr_idx] = ptr;
 
+      double log_cycles = log(end - begin);
+      dynamic_histogram->addValue(log_cycles);
+      dynamic_kde->addValue(log_cycles);
       dynamic_kde_2d->addValue(log_size, log(end - begin));
     }
-
-    //if (i % 1000000 == 0) {
-    //  printf("%s\n", dynamic_kde_2d->asProto().DebugString().c_str());
-    //}
   }
 }
 

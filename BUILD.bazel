@@ -214,6 +214,8 @@ cc_binary(
     srcs = ["cpp/run_malloc.cpp"],
     deps = [
         ":density_map_server",
+        ":dynamic_histogram",
+        ":dynamic_kde",
         ":dynamic_kde_2d",
     ],
     copts = [

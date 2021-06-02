@@ -55,13 +55,7 @@ class Description {
   const Identifier& identifier() const { return identifier_; }
 
   void setFromProto(const DensityMapDescription& proto) {
-    if (type_ == MapType::HISTOGRAM) {
-      assert(proto.type() == DensityMapDescription::HISTOGRAM);
-    } else if (type_ == MapType::KDE) {
-      assert(proto.type() == DensityMapDescription::KDE);
-    } else {
-      assert(proto.type() == DensityMapDescription::KDE2D);
-    }
+    printf("> setFromProto(%s)\n", proto.DebugString().c_str());
 
     title_ = proto.title();
 
@@ -71,6 +65,8 @@ class Description {
     }
 
     decay_rate_ = proto.decay_rate();
+
+    printf("< %s\n", asProto().DebugString().c_str());
   }
 
   const std::string& title() const { return title_; }
@@ -81,6 +77,12 @@ class Description {
 
   double decay_rate() const { return decay_rate_; }
   void set_decay_rate(double decay_rate) { decay_rate_ = decay_rate; }
+
+  DensityMapDescription asProto() const {
+    DensityMapDescription desc;
+    toProto(&desc);
+    return desc;
+  }
 
   void toProto(DensityMapDescription* proto) const {
     DensityMapIdentifier* identifier = proto->mutable_identifier();

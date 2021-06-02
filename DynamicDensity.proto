@@ -20,6 +20,7 @@ message RPCQueryResult {
   oneof result {
     ListDensityMapsResult list_density_maps_result = 1;
     DensityMap density_map_result = 2;
+    DensityMapDescription density_map_description = 3;
   }
 }
 

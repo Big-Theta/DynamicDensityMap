@@ -129,26 +129,28 @@ class DensityMapsRegistry {
   }
 
   Status SetDensityMapOptions(const DensityMapDescription& request,
-                              DensityMap* reply) {
+                              DensityMapDescription* reply) {
     int32_t id = request.identifier().identity();
+    printf("> SetDensityMapOptions -- %d\n", id);
     for (auto& hist : dhists_) {
       if (hist->description().identifier().identifier() == id) {
         hist->mutable_description()->setFromProto(request);
-        hist->toProto(reply);
+        hist->description().toProto(reply);
         return Status::OK;
       }
     }
     for (auto& kde : dkdes_) {
       if (kde->description().identifier().identifier() == id) {
         kde->mutable_description()->setFromProto(request);
-        kde->toProto(reply);
+        kde->description().toProto(reply);
         return Status::OK;
       }
     }
     for (auto& kde2d : dkde2ds_) {
       if (kde2d->description().identifier().identifier() == id) {
+    printf(". SetDensityMapOptions -- found\n");
         kde2d->mutable_description()->setFromProto(request);
-        kde2d->toProto(reply);
+        kde2d->description().toProto(reply);
         return Status::OK;
       }
     }
@@ -230,9 +232,11 @@ class DynamicDensityServiceImpl final
               reply_.mutable_density_map_result());
         } else {
           assert(request_.has_set_density_map_description());
+          printf("> set_density_map_description(): %s\n",
+                 request_.DebugString().c_str());
           DensityMapsRegistry::getInstance().SetDensityMapOptions(
               request_.set_density_map_description(),
-              reply_.mutable_density_map_result());
+              reply_.mutable_density_map_description());
         }
 
         // And we are done! Let the gRPC runtime know we've finished, using the
