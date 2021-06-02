@@ -43,8 +43,7 @@ int main() {
 
   std::default_random_engine gen;
   std::uniform_int_distribution<size_t> ptr_idx_dist(0, kNumPtrs - 1);
-  // After taking e^(rand), the value will be between 1B and 1MB.
-  std::uniform_real_distribution log_size_dist(0.0, 13.86294);
+  std::uniform_real_distribution log_size_dist(0.0, log(1024 * 1024));
 
   while (true) {
     size_t ptr_idx = ptr_idx_dist(gen);
@@ -63,7 +62,7 @@ int main() {
       double log_cycles = log(end - begin);
       dynamic_histogram->addValue(log_cycles);
       dynamic_kde->addValue(log_cycles);
-      dynamic_kde_2d->addValue(log_size, log(end - begin));
+      dynamic_kde_2d->addValue(log_size, log_cycles);
     }
   }
 }
