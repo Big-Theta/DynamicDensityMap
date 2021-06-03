@@ -39,7 +39,7 @@ int main() {
           /*num_kernels=*/100, /*decay_rate=*/0.00001);
   description = dynamic_kde_2d->mutable_description();
   description->set_title("malloc");
-  description->set_labels({"log(size)", "log(cycles)"});
+  description->set_labels({"log(cycles)", "log(size)"});
 
   std::default_random_engine gen;
   std::uniform_int_distribution<size_t> ptr_idx_dist(0, kNumPtrs - 1);
@@ -62,7 +62,7 @@ int main() {
       double log_cycles = log(end - begin);
       dynamic_histogram->addValue(log_cycles);
       dynamic_kde->addValue(log_cycles);
-      dynamic_kde_2d->addValue(log_size, log_cycles);
+      dynamic_kde_2d->addValue(log_cycles, log_size);
     }
   }
 }

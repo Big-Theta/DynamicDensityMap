@@ -25,7 +25,6 @@
 #include <google/protobuf/util/time_util.h>
 
 #include <algorithm>
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -75,6 +74,7 @@ class DynamicHistogram {
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
+        split_threshold_(0.0),
         insertion_buffer_(/*buffer_size=*/2 * refresh_interval) {
     ubounds_.resize(num_buckets);
     ubounds_.back() = std::numeric_limits<double>::max();
@@ -126,7 +126,6 @@ class DynamicHistogram {
   int getBucketIndexByValue(double val) const { return -1; }
 
   double getMin() const {
-    assert(bucket_generation_[0] == bucket_generation_[1]);
     if (counts_[1] == 0) {
       return ubounds_[0];
     }
@@ -136,7 +135,6 @@ class DynamicHistogram {
 
   double getMax() const {
     const size_t bx = ubounds_.size() - 2;
-    assert(bucket_generation_[bx] == bucket_generation_[bx - 1]);
     if (counts_[bx] == 0.0) {
       // The last ubounds_ value is a fake value that allows std::upper_bound
       // to work.
@@ -245,7 +243,7 @@ class DynamicHistogram {
     return count / computeTotalCount();
   }
 
-  void trackQuantiles(const std::vector<double> &quantiles) {}
+  void trackQuantiles(const std::vector<double>& quantiles) {}
 
   std::map<double, double> getTrackedQuantiles() const {
     return std::map<double, double>();
@@ -299,13 +297,9 @@ class DynamicHistogram {
     return s;
   }
 
-  const Description& description() const {
-    return description_;
-  }
+  const Description& description() const { return description_; }
 
-  Description* mutable_description() {
-    return &description_;
-  }
+  Description* mutable_description() { return &description_; }
 
   DensityMap asProto() {
     DensityMap dm;
@@ -314,9 +308,9 @@ class DynamicHistogram {
   }
 
   void toProto(DensityMap* proto) {
-    auto *dhist = proto->mutable_dynamic_histogram();
+    auto* dhist = proto->mutable_dynamic_histogram();
 
-    auto *desc = dhist->mutable_description();
+    auto* desc = dhist->mutable_description();
     description().toProto(desc);
 
     auto flush_it = insertion_buffer_.lockedIterator();
@@ -341,6 +335,7 @@ class DynamicHistogram {
   uint64_t generation_;
   uint64_t refresh_generation_;
   double total_count_;
+  double split_threshold_;
 
   InsertionBuffer<double> insertion_buffer_;
 
@@ -354,9 +349,9 @@ class DynamicHistogram {
   std::vector<double> quantile_locations_;
   std::vector<double> decay_factors_;
 
-  double decay_rate() const {
-    return description().decay_rate();
-  }
+  double splitThreshold() const { return split_threshold_; }
+
+  double decay_rate() const { return description().decay_rate(); }
 
   void flush(FlushIterator<double>* flush_it) {
     for (; *flush_it; ++(*flush_it)) {
@@ -389,25 +384,15 @@ class DynamicHistogram {
     }
 
     refresh();
-    if (decay_rate() != 0.0) {
-      for (size_t i = 0; i < bucket_generation_.size(); i++) {
-        assert(bucket_generation_[i] == generation_);
-      }
-    }
 
     split(bx);
     merge();
   }
 
-  double splitThreshold() const { return 2 * total_count_ / getNumBuckets(); }
-
   double countAfterDecay(double original, uint64_t generations) {
     if (decay_rate() == 0.0) {
       return original;
     }
-    // This invariant should be maintained by addValue calling refresh()
-    // periodically.
-    assert(generations < decay_factors_.size());
     return original * decay_factors_[generations];
   }
 
@@ -426,11 +411,25 @@ class DynamicHistogram {
     }
 
     total_count_ = 0.0;
+    double min_count = std::numeric_limits<double>::max();
+    double max_count = 0.0;
     for (size_t bx = 0; bx < counts_.size(); bx++) {
       decay(bx);
-      total_count_ += counts_[bx];
+      double count = counts_[bx];
+      total_count_ += count;
+      if (count < min_count) {
+        min_count = count;
+      }
+      if (count > max_count) {
+        max_count = count;
+      }
     }
     refresh_generation_ = generation_;
+    if (min_count * 4 < max_count) {
+      split_threshold_ = max_count;
+    } else {
+      split_threshold_ = 2 * total_count_ / getNumBuckets();
+    }
   }
 
   // Adjust bounds and add.
@@ -447,15 +446,20 @@ class DynamicHistogram {
     if (bx > 0) {
       decay(bx - 1);
       double count_with_below = counts_[bx - 1] + count_bx;
-      ubounds_[bx - 1] = (count_with_below * ubounds_[bx - 1] + val) /
-                         (count_with_below + 1.0);
+      ubounds_[bx - 1] =
+          std::max(std::min((count_with_below * ubounds_[bx - 1] + val) /
+                                (count_with_below + 1.0),
+                            ubounds_[bx]),
+                   ubounds_[bx - 1]);
     }
 
     if (bx + 1 < counts_.size()) {
       decay(bx + 1);
       double count_with_above = count_bx + counts_[bx + 1];
-      ubounds_[bx] =
-          (count_with_above * ubounds_[bx] + val) / (count_with_above + 1.0);
+      ubounds_[bx] = std::min(std::max((count_with_above * ubounds_[bx] + val) /
+                                           (count_with_above + 1.0),
+                                       ubounds_[bx - 1]),
+                              ubounds_[bx]);
     }
 
     counts_[bx] = count_bx + 1;

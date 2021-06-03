@@ -71,17 +71,35 @@ def extract_histograms(data: str) -> List[dict]:
 
 def prepare_render_hist(
         proto: DynamicDensity_pb2.DynamicHistogram, alpha: float = 1.0):
-    counts = np.array(proto.counts)
-    total_count = sum(counts)
-    xs = np.repeat(1, len(proto.counts))
-    weights = np.array([count / total_count for count in counts])
+    x_min = proto.bounds[0]
+    x_max = proto.bounds[-1]
+    x_d = np.linspace(x_min, x_max, args.num_points)
+    f = np.zeros(len(x_d))
+    total_count = sum(proto.counts)
 
-    for i in range(len(proto.bounds) - 1):
-        print(proto.bounds[i], proto.bounds[i + 1], proto.bounds[i + 1] >= proto.bounds[i], proto.bounds[i + 1] - proto.bounds[i])
-        if proto.bounds[i + 1] < proto.bounds[i]:
-            break
-    print(proto.bounds)
-    print(proto.bounds == sorted(proto.bounds))
+    def cdf(x):
+        c = 0.0
+        idx = 0
+
+        while proto.bounds[idx + 1] < x:
+            c += proto.counts[idx]
+            idx += 1
+
+        if idx < len(proto.counts):
+            c += proto.counts[idx] * (
+                    (x - proto.bounds[idx]) /
+                    (proto.bounds[idx + 1] - proto.bounds[idx]))
+        else:
+            c += proto.counts[-1]
+
+        return c / total_count
+
+    last_cdf = 0.0
+    for i in range(1, len(x_d)):
+        x = x_d[i]
+        this_cdf = cdf(x)
+        f[i] = this_cdf - last_cdf
+        last_cdf = this_cdf
 
     title = proto.description.title
     label = ""
@@ -90,9 +108,7 @@ def prepare_render_hist(
 
     pyplot.clf()
     pyplot.title(title)
-    #pyplot.fill_between(
-    #        bins.repeat(2)[1:-1], heights.repeat(2), alpha=alpha, label=label)
-    pyplot.hist(x=xs, bins=proto.bounds, weights=weights)
+    pyplot.fill_between(x_d, f, alpha=alpha, label=label)
     pyplot.legend()
 
 
