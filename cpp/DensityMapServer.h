@@ -22,10 +22,7 @@
 
 #pragma once
 
-#include <grpc/support/log.h>
-#include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/grpcpp.h>
-#include <grpcpp/health_check_service_interface.h>
 
 #include <iostream>
 #include <memory>

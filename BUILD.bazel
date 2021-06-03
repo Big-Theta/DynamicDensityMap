@@ -202,7 +202,6 @@ cc_library(
         ":dynamic_kde",
         ":dynamic_kde_2d",
         "@com_github_grpc_grpc//:grpc++",
-        "@com_github_grpc_grpc//:grpc++_reflection",
     ],
     copts = [
         "-std=c++17",
