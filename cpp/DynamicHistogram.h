@@ -63,30 +63,78 @@ class Bucket {
   double count_;
 };
 
+class DynamicHistogramOpts {
+ public:
+  DynamicHistogramOpts()
+      : num_buckets_(100),
+        decay_rate_(0.0),
+        refresh_interval_(512),
+        title_("title"),
+        label_("label") {}
+
+  DynamicHistogramOpts& set_num_buckets(size_t num_buckets) {
+    num_buckets_ = num_buckets;
+    return *this;
+  }
+  size_t num_buckets() const { return num_buckets_; }
+
+  DynamicHistogramOpts& set_decay_rate(double decay_rate) {
+    decay_rate_ = decay_rate;
+    return *this;
+  }
+  double decay_rate() const { return decay_rate_; }
+
+  DynamicHistogramOpts& set_refresh_interval(size_t refresh_interval) {
+    refresh_interval_ = refresh_interval;
+    return *this;
+  }
+  size_t refresh_interval() const { return refresh_interval_; }
+
+  DynamicHistogramOpts& set_title(std::string title) {
+    title_ = title;
+    return *this;
+  }
+  std::string title() const { return title_; }
+
+  DynamicHistogramOpts& set_label(std::string label) {
+    label_ = label;
+    return *this;
+  }
+  std::string label() const { return label_; }
+
+ private:
+  size_t num_buckets_;
+  double decay_rate_;
+  size_t refresh_interval_;
+  std::string title_;
+  std::string label_;
+};
+
 class DynamicHistogram {
  public:
-  DynamicHistogram(size_t num_buckets, double decay_rate = 0.0,
-                   size_t refresh_interval = 512, int32_t identity = 0)
-      : refresh_interval_(refresh_interval),
-        description_(/*type=*/Description::MapType::HISTOGRAM,
-                     /*decay_rate=*/decay_rate,
-                     /*identity=*/identity),
+  DynamicHistogram(const DynamicHistogramOpts& opts)
+      : refresh_interval_(opts.refresh_interval()),
+        description_(DescriptionOpts()
+                         .set_type(MapType::HISTOGRAM)
+                         .set_decay_rate(opts.decay_rate())
+                         .set_title(opts.title())
+                         .set_labels({opts.label()})),
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
         split_threshold_(0.0),
-        insertion_buffer_(/*buffer_size=*/2 * refresh_interval) {
-    ubounds_.resize(num_buckets);
+        insertion_buffer_(/*buffer_size=*/2 * opts.refresh_interval()) {
+    ubounds_.resize(opts.num_buckets());
     ubounds_.back() = std::numeric_limits<double>::max();
-    counts_.resize(num_buckets);
-    bucket_generation_.resize(num_buckets);
+    counts_.resize(opts.num_buckets());
+    bucket_generation_.resize(opts.num_buckets());
 
-    if (decay_rate != 0.0) {
+    if (opts.decay_rate() != 0.0) {
       decay_factors_.resize(refresh_interval_);
       double decay = 1.0;
       for (size_t i = 0; i < refresh_interval_; i++) {
         decay_factors_[i] = decay;
-        decay *= 1.0 - decay_rate;
+        decay *= 1.0 - opts.decay_rate();
       }
     }
   }
@@ -349,6 +397,10 @@ class DynamicHistogram {
   std::vector<double> quantile_locations_;
   std::vector<double> decay_factors_;
 
+  void setIdentity(int32_t identity) {
+    mutable_description()->setIdentity(identity);
+  }
+
   double splitThreshold() const { return split_threshold_; }
 
   double decay_rate() const { return description().decay_rate(); }
@@ -446,20 +498,21 @@ class DynamicHistogram {
     if (bx > 0) {
       decay(bx - 1);
       double count_with_below = counts_[bx - 1] + count_bx;
-      ubounds_[bx - 1] =
-          std::max(std::min((count_with_below * ubounds_[bx - 1] + val) /
-                                (count_with_below + 1.0),
-                            ubounds_[bx]),
-                   ubounds_[bx - 1]);
+      // Roundoff issues can happen, so make sure that the bound does *not* move
+      // left.
+      ubounds_[bx - 1] = std::max((count_with_below * ubounds_[bx - 1] + val) /
+                                      (count_with_below + 1.0),
+                                  ubounds_[bx - 1]);
     }
 
     if (bx + 1 < counts_.size()) {
       decay(bx + 1);
       double count_with_above = count_bx + counts_[bx + 1];
-      ubounds_[bx] = std::min(std::max((count_with_above * ubounds_[bx] + val) /
-                                           (count_with_above + 1.0),
-                                       ubounds_[bx - 1]),
-                              ubounds_[bx]);
+      // Roundoff issues can happen, so make sure that the bound does *not* move
+      // right.
+      ubounds_[bx] = std::min(
+          (count_with_above * ubounds_[bx] + val) / (count_with_above + 1.0),
+          ubounds_[bx]);
     }
 
     counts_[bx] = count_bx + 1;

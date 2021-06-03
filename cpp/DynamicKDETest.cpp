@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 
 using dhist::DynamicKDE;
+using dhist::DynamicKDEOpts;
 using dhist::Kernel;
 using dynamic_density::DensityMap;
 using testing::ContainerEq;
@@ -100,7 +101,8 @@ TEST(KernelTest, populateProto) {
 TEST(DynamicKDETest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
-  DynamicKDE uut(/*num_kernels=*/31, /*decay_rate=*/kDecayRate);
+  DynamicKDE uut(
+      DynamicKDEOpts().set_num_kernels(31).set_decay_rate(kDecayRate));
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -119,7 +121,8 @@ TEST(DynamicKDETest, addNoDecay) {
 TEST(DynamicKDETest, addWithDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.00001;
-  DynamicKDE uut(/*num_kernels=*/31, /*decay_rate=*/kDecayRate);
+  DynamicKDE uut(
+      DynamicKDEOpts().set_num_kernels(31).set_decay_rate(kDecayRate));
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -137,7 +140,7 @@ TEST(DynamicKDETest, addWithDecay) {
 }
 
 TEST(DynamicKDETest, asProto) {
-  DynamicKDE uut(/*num_kernels=*/61);
+  DynamicKDE uut(DynamicKDEOpts().set_num_kernels(61));
   uut.mutable_description()->set_title("test");
   uut.mutable_description()->set_labels({"x-value"});
   std::normal_distribution<double> norm(10000.0, 1.0);
@@ -165,7 +168,7 @@ TEST(DynamicKDETest, asProto) {
 }
 
 TEST(DynamicKDETest, count) {
-  DynamicKDE uut(/*num_kernels=*/61);
+  DynamicKDE uut(DynamicKDEOpts().set_num_kernels(61));
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 

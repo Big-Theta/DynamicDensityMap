@@ -208,28 +208,76 @@ class Kernel2D {
   uint64_t generation_;
 };
 
+class DynamicKDE2DOpts {
+ public:
+  DynamicKDE2DOpts()
+      : num_kernels_(100),
+        decay_rate_(0.0),
+        refresh_interval_(512),
+        title_("title"),
+        labels_({"x-label", "y-label"}) {}
+
+  DynamicKDE2DOpts& set_num_kernels(size_t num_kernels) {
+    num_kernels_ = num_kernels;
+    return *this;
+  }
+  size_t num_kernels() const { return num_kernels_; }
+
+  DynamicKDE2DOpts& set_decay_rate(double decay_rate) {
+    decay_rate_ = decay_rate;
+    return *this;
+  }
+  double decay_rate() const { return decay_rate_; }
+
+  DynamicKDE2DOpts& set_refresh_interval(size_t refresh_interval) {
+    refresh_interval_ = refresh_interval;
+    return *this;
+  }
+  size_t refresh_interval() const { return refresh_interval_; }
+
+  DynamicKDE2DOpts& set_title(std::string title) {
+    title_ = title;
+    return *this;
+  }
+  std::string title() const { return title_; }
+
+  DynamicKDE2DOpts& set_labels(std::vector<std::string> labels) {
+    labels_ = labels;
+    return *this;
+  }
+  std::vector<std::string> labels() const { return labels_; }
+
+ private:
+  size_t num_kernels_;
+  double decay_rate_;
+  size_t refresh_interval_;
+  std::string title_;
+  std::vector<std::string> labels_;
+};
+
 class DynamicKDE2D {
  public:
-  DynamicKDE2D(size_t num_kernels, double decay_rate = 0.0,
-               size_t refresh_interval = 512, int32_t identity = 0)
-      : refresh_interval_(refresh_interval),
-        description_(/*type=*/Description::MapType::KDE2D,
-                     /*decay_rate=*/decay_rate,
-                     /*identity=*/identity),
+  DynamicKDE2D(const DynamicKDE2DOpts& opts)
+      : refresh_interval_(opts.refresh_interval()),
+        description_(DescriptionOpts()
+                         .set_type(MapType::KDE2D)
+                         .set_decay_rate(opts.decay_rate())
+                         .set_title(opts.title())
+                         .set_labels(opts.labels())),
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
         split_threshold_(0.0),
-        insertion_buffer_(/*buffer_size=*/2 * refresh_interval) {
-    kernels_.reserve(num_kernels + 2);
-    kernels_.resize(num_kernels);
+        insertion_buffer_(/*buffer_size=*/2 * opts.refresh_interval()) {
+    kernels_.reserve(opts.num_kernels() + 2);
+    kernels_.resize(opts.num_kernels());
 
-    if (decay_rate != 0.0) {
+    if (opts.decay_rate() != 0.0) {
       decay_factors_.resize(refresh_interval_);
       double decay = 1.0;
       for (size_t i = 0; i < refresh_interval_; i++) {
         decay_factors_[i] = decay;
-        decay *= 1.0 - decay_rate;
+        decay *= 1.0 - opts.decay_rate();
       }
     }
   }

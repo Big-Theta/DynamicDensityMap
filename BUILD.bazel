@@ -31,21 +31,12 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "dynamic_histogram_reference",
-    hdrs = ["cpp/DynamicHistogramReference.h"],
-    copts = [
-        "-std=c++17",
-    ],
-)
-
 cc_test(
     name = "dynamic_histogram_test",
     srcs = ["cpp/DynamicHistogramTest.cpp"],
     deps = [
         ":dynamic_density_cc_proto",
         ":dynamic_histogram",
-        ":dynamic_histogram_reference",
         "@gtest//:gtest",
         "@gtest//:gtest_main"
     ],
@@ -115,8 +106,8 @@ cc_binary(
     srcs = ["cpp/DynamicHistogramBenchmark.cpp"],
     deps = [
         ":dynamic_histogram",
-        ":dynamic_histogram_reference",
         ":dynamic_kde",
+        ":dynamic_kde_2d",
         "@benchmark//:benchmark",
     ],
     copts = [

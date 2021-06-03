@@ -34,23 +34,70 @@ using ::google::protobuf::Timestamp;
 
 class Identifier {
  public:
-  Identifier(int32_t identifier): identifier_(identifier) {}
+  Identifier(): identity_(0) {}
 
-  int32_t identifier() const { return identifier_; }
+  int32_t identity() const { return identity_; }
+
+ protected:
+  friend class Description;
+
+  void setIdentity(int32_t identity) {
+    identity_ = identity;
+  }
 
  private:
-  int32_t identifier_;
+  int32_t identity_;
+};
+
+enum class MapType { UNKNOWN, HISTOGRAM, KDE, KDE2D };
+
+class Description;
+
+class DescriptionOpts {
+ public:
+  DescriptionOpts()
+      : type_(MapType::UNKNOWN),
+        decay_rate_(0.0),
+        title_("title"),
+        labels_({""}) {}
+
+  DescriptionOpts& set_type(MapType type) {
+    type_ = type;
+    return *this;
+  }
+  MapType type() const { return type_; }
+
+  DescriptionOpts& set_decay_rate(double decay_rate) {
+    decay_rate_ = decay_rate;
+    return *this;
+  }
+  double decay_rate() const { return decay_rate_; }
+
+  DescriptionOpts& set_title(std::string title) {
+    title_ = title;
+    return *this;
+  }
+  const std::string& title() const { return title_; }
+
+  DescriptionOpts& set_labels(std::vector<std::string> labels) {
+    labels_ = labels;
+    return *this;
+  }
+  std::vector<std::string> labels() const { return labels_; }
+
+ private:
+  MapType type_;
+  double decay_rate_;
+  std::string title_;
+  std::vector<std::string> labels_;
 };
 
 class Description {
  public:
-  enum class MapType { HISTOGRAM, KDE, KDE2D };
-
-  Description(MapType type, double decay_rate, int32_t identifier = 0)
-      : identifier_(Identifier(identifier)),
-        title_(""),
-        decay_rate_(decay_rate),
-        type_(type) {}
+  Description(const DescriptionOpts& opts)
+      : title_(opts.title()),
+        decay_rate_(opts.decay_rate()),
+        type_(opts.type()) {}
 
   const Identifier& identifier() const { return identifier_; }
 
@@ -86,7 +133,7 @@ class Description {
 
   void toProto(DensityMapDescription* proto) const {
     DensityMapIdentifier* identifier = proto->mutable_identifier();
-    identifier->set_identity(identifier_.identifier());
+    identifier->set_identity(identifier_.identity());
 
     proto->set_title(title_);
 
@@ -123,6 +170,15 @@ class Description {
     to_proto->mutable_timestamp()->set_nanos(from_proto.timestamp().nanos());
     to_proto->set_decay_rate(from_proto.decay_rate());
     to_proto->set_type(from_proto.type());
+  }
+
+ protected:
+  friend class DynamicHistogram;
+  friend class DynamicKDE;
+  friend class DynamicKDE2d;
+
+  void setIdentity(int32_t identity) {
+    identifier_.setIdentity(identity);
   }
 
  private:

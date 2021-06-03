@@ -19,7 +19,7 @@ grpc_deps()
 git_repository(
     name = "benchmark",
     remote = "https://github.com/google/benchmark",
-    branch = "master",
+    tag = "v1.5.4",
 )
 
 git_repository(

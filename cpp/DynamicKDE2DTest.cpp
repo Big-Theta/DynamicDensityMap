@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 
 using dhist::DynamicKDE2D;
+using dhist::DynamicKDE2DOpts;
 using dhist::Kernel2D;
 using dynamic_density::DensityMap;
 using testing::ContainerEq;
@@ -94,7 +95,8 @@ TEST(KernelTest, populateProto) {
 TEST(DynamicKDE2DTest, addNoDecay) {
   static constexpr int kNumValues = 1000000;
   static constexpr double kDecayRate = 0.0;
-  DynamicKDE2D uut(/*num_kernels=*/200, /*decay_rate=*/kDecayRate);
+  DynamicKDE2D uut(
+      DynamicKDE2DOpts().set_num_kernels(200).set_decay_rate(kDecayRate));
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
   std::uniform_real_distribution unif(0.0, 1.0);
@@ -129,61 +131,3 @@ TEST(DynamicKDE2DTest, addNoDecay) {
   ASSERT_TRUE(uut.asProto().SerializeToOstream(&myfile));
   myfile.close();
 }
-
-//TEST(DynamicKDE2DTest, addWithDecay) {
-//  static constexpr int kNumValues = 100000;
-//  static constexpr double kDecayRate = 0.00001;
-//  DynamicKDE2D uut(/*num_kernels=*/31, /*decay_rate=*/kDecayRate);
-//  std::default_random_engine gen;
-//  std::normal_distribution<double> norm(0.0, 1.0);
-//
-//  for (int i = 0; i < kNumValues; i++) {
-//    uut.addValue(norm(gen));
-//  }
-//
-//  EXPECT_NEAR(uut.computeTotalCount(),
-//              exponential_sum(1, 1 - kDecayRate, kNumValues), 1e-6);
-//  EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1);
-//  EXPECT_NEAR(uut.getQuantileEstimate(0.05), -1.644854, 1e-1);
-//  EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
-//
-//  EXPECT_NEAR(uut.getMean(), 0.0, 1e-1) << uut.debugString();
-//}
-//
-//TEST(DynamicKDE2DTest, toProto) {
-//  DynamicKDE2D uut(/*num_kernels=*/61);
-//  std::normal_distribution<double> norm(10000.0, 1.0);
-//  std::default_random_engine gen;
-//
-//  static constexpr int kNumValues = 1000000;
-//  for (int i = 0; i < kNumValues; i++) {
-//    uut.addValue(norm(gen));
-//  }
-//
-//  DensityMap dm = uut.toProto("test", "x-value");
-//
-//  EXPECT_EQ(dm.dynamic_kde().title(), "test");
-//  EXPECT_EQ(dm.dynamic_kde().label()[0], "x-value");
-//
-//  size_t size = dm.dynamic_kde().kernels().size();
-//  EXPECT_EQ(size, 61);
-//  EXPECT_LT(dm.dynamic_kde().kernels()[0].coord()[0], 10000.0);
-//  EXPECT_GT(dm.dynamic_kde().kernels()[size - 1].coord()[0], 10000.0);
-//
-//  // std::ofstream myfile("/tmp/DynamicKDE.pbuf");
-//  // ASSERT_TRUE(myfile.is_open());
-//  // ASSERT_TRUE(dm.SerializeToOstream(&myfile));
-//  // myfile.close();
-//}
-//
-//TEST(DynamicKDE2DTest, count) {
-//  DynamicKDE uut(/*num_kernels=*/61);
-//  std::normal_distribution<double> norm(10000.0, 1.0);
-//  std::default_random_engine gen;
-//
-//  static constexpr int kNumValues = 1000000;
-//  for (int i = 0; i < kNumValues; i++) {
-//    uut.addValue(norm(gen));
-//    ASSERT_EQ(uut.computeTotalCount(), i + 1) << uut.debugString();
-//  }
-//}
