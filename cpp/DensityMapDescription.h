@@ -26,7 +26,7 @@
 
 #include "DynamicDensity.pb.h"
 
-namespace dhist {
+namespace dyden {
 
 using ::dynamic_density::DensityMapIdentifier;
 using ::dynamic_density::DensityMapDescription;
@@ -189,4 +189,4 @@ class Description {
   MapType type_;
 };
 
-}  // namespace dhist
+}  // namespace dyden

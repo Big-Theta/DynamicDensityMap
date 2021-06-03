@@ -37,7 +37,7 @@
 #include "cpp/DynamicKDE.h"
 #include "cpp/DynamicKDE2D.h"
 
-namespace dhist {
+namespace dyden {
 
 using grpc::Server;
 using grpc::ServerAsyncResponseWriter;
@@ -302,4 +302,4 @@ class DensityMapDaemon {
   }
 };
 
-}  // namespace dhist
+}  // namespace dyden

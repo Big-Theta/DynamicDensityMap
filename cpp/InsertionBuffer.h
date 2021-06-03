@@ -30,7 +30,7 @@
 #include <mutex>
 #include <vector>
 
-namespace dhist {
+namespace dyden {
 
 template <typename T>
 class InsertionBuffer;
@@ -142,4 +142,4 @@ class InsertionBuffer {
   std::vector<T> buffer_;
 };
 
-}  // namespace dhist
+}  // namespace dyden

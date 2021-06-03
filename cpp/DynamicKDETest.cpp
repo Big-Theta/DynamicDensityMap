@@ -12,9 +12,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using dhist::DynamicKDE;
-using dhist::DynamicKDEOpts;
-using dhist::Kernel;
+using dyden::DynamicKDE;
+using dyden::DynamicKDEOpts;
+using dyden::Kernel;
 using dynamic_density::DensityMap;
 using testing::ContainerEq;
 using testing::Eq;

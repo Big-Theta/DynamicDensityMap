@@ -13,34 +13,34 @@ uint64_t rdtsc(){
 }
 
 int main() {
-  dhist::DensityMapDaemon::startDaemon();
+  dyden::DensityMapDaemon::startDaemon();
 
   static constexpr size_t kNumPtrs = 4096;
   void* ptrs[kNumPtrs];
   memset(ptrs, 0, sizeof(void*) * kNumPtrs);
 
-  dhist::DynamicHistogram dynamic_histogram(dhist::DynamicHistogramOpts()
+  dyden::DynamicHistogram dynamic_histogram(dyden::DynamicHistogramOpts()
                                                 .set_num_buckets(100)
                                                 .set_decay_rate(0.00001)
                                                 .set_title("malloc")
                                                 .set_label("log(cycles)"));
-  dhist::DensityMapRegistry::getInstance().registerDynamicHistogram(
+  dyden::DensityMapRegistry::getInstance().registerDynamicHistogram(
       &dynamic_histogram);
 
-  dhist::DynamicKDE dynamic_kde(dhist::DynamicKDEOpts()
+  dyden::DynamicKDE dynamic_kde(dyden::DynamicKDEOpts()
                                                 .set_num_kernels(100)
                                                 .set_decay_rate(0.00001)
                                                 .set_title("malloc")
                                                 .set_label("log(cycles)"));
-  dhist::DensityMapRegistry::getInstance().registerDynamicKDE(&dynamic_kde);
+  dyden::DensityMapRegistry::getInstance().registerDynamicKDE(&dynamic_kde);
 
-  dhist::DynamicKDE2D dynamic_kde_2d(
-      dhist::DynamicKDE2DOpts()
+  dyden::DynamicKDE2D dynamic_kde_2d(
+      dyden::DynamicKDE2DOpts()
           .set_num_kernels(100)
           .set_decay_rate(0.00001)
           .set_title("malloc")
           .set_labels({"log(cycles)", "log(size)"}));
-  dhist::DensityMapRegistry::getInstance().registerDynamicKDE2D(
+  dyden::DensityMapRegistry::getInstance().registerDynamicKDE2D(
       &dynamic_kde_2d);
 
   std::default_random_engine gen;

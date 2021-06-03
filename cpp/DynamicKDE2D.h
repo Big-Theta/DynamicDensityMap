@@ -38,7 +38,7 @@
 #include "cpp/DensityMapDescription.h"
 #include "cpp/InsertionBuffer.h"
 
-namespace dhist {
+namespace dyden {
 
 using ::dynamic_density::DensityMapIdentifier;
 using ::dynamic_density::DensityMapDescription;
@@ -515,4 +515,4 @@ class DynamicKDE2D {
   }
 };
 
-}  // namespace dhist
+}  // namespace dyden

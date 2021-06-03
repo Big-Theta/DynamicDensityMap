@@ -34,7 +34,7 @@
 #include "cpp/DensityMapDescription.h"
 #include "cpp/InsertionBuffer.h"
 
-namespace dhist {
+namespace dyden {
 
 using ::dynamic_density::DensityMap;
 using ::google::protobuf::Timestamp;
@@ -634,4 +634,4 @@ class DynamicHistogram {
   }
 };
 
-}  // namespace dhist
+}  // namespace dyden

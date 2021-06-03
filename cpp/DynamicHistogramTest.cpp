@@ -12,9 +12,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using dhist::DynamicHistogram;
-using dhist::DynamicHistogramOpts;
-using dhist::in_range;
+using dyden::DynamicHistogram;
+using dyden::DynamicHistogramOpts;
+using dyden::in_range;
 using dynamic_density::DensityMap;
 using testing::ContainerEq;
 using testing::Eq;
