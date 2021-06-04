@@ -16,57 +16,27 @@ import os
 import sys
 
 parser = argparse.ArgumentParser(description='Display a dynamic density map.')
-parser.add_argument("--stdin", type=bool, default=False)
-parser.add_argument("--animate", type=bool, default=False)
+parser.add_argument("--animate", action="store_true")
 parser.add_argument("--proto", type=str, default="")
 parser.add_argument("--server", type=str, default="0.0.0.0:50051")
-parser.add_argument("--list", type=bool, default=False)
-parser.add_argument("--show", type=int, default=0)
+parser.add_argument(
+        "--list", action="store_true",
+        help="List all density maps found on the server.")
+parser.add_argument(
+        "--show", type=int, default=0,
+        help="List all density maps found on the server.")
 parser.add_argument(
         "--set_description", type=str, default="",
-        help='A json. E.g., --set_description=\''
-             '{"identifier": {"identity": 1}, '
-             '"title": "My Title", '
-             '"labels": ["MyXLabel", "MyYLabel"], '
-             '"decay_rate": 0.0001}\'')
-parser.add_argument("--num_points", type=int, default=100)
+        help='A json. The "identity" must match a density map on the server. '
+             'E.g., --set_description=\''
+             '{"identifier": {"identity": 1}, "title": "My Title", '
+             '"labels": ["MyXLabel", "MyYLabel"], "decay_rate": 0.0001}\'')
+parser.add_argument(
+        "--num_points", type=int, default=100,
+        help="The number of points to use for the display. "
+             "A small number will reduce the processing time needed to produce "
+             "graphs but will also reduce resolution.")
 args = parser.parse_args()
-
-
-def check_histogram(data: Dict) -> bool:
-    if len(data["bounds"]) == len(data["counts"]) + 1:
-        return True
-    return False
-
-
-def extract_histograms(data: str) -> List[dict]:
-    candidates = []
-    open_brace = None
-    nest_count = 0
-    data = data.replace("\n", "")
-    for i, ch in enumerate(data):
-        if ch == "{":
-            if nest_count == 0:
-                open_brace = i
-            nest_count += 1
-        elif ch == "}":
-            if nest_count == 0:
-                continue
-            elif nest_count == 1:
-                candidates.append(data[open_brace:i+1])
-            nest_count -= 1
-
-    # Pick out only json.
-    cleaned = []
-    for candidate in candidates:
-        try:
-            cleaned.append(json.loads(candidate))
-        except json.decoder.JSONDecodeError:
-            pass
-
-    # Make sure that only json objects with the keys "bounds" and
-    # "counts" are present.
-    return [c for c in cleaned if check_histogram(c)]
 
 
 def prepare_render_hist(
@@ -269,44 +239,6 @@ def gen_from_server():
             yield
 
 
-def compute_mean(histogram: Dict) -> float:
-    acc = 0.0
-    total = 0.0
-    for i in range(len(histogram["bounds"]) - 1):
-        acc += (histogram["counts"][i]
-                * (histogram["bounds"][i] + histogram["bounds"][i + 1])
-                / 2)
-        total += histogram["counts"][i]
-    return acc / total
-
-
-colors = pyplot.rcParams["axes.prop_cycle"].by_key()["color"]
-color_index = 0
-
-def next_frame(i, hist_generator):
-    global color_index
-    color = colors[color_index]
-
-    pyplot.clf()
-
-    for _ in range(25):
-        histogram = next(hist_generator)
-
-    counts = np.array(histogram["counts"])
-    total_count = sum(counts)
-    weights = np.array([count / total_count for count in counts])
-    bins = np.array(histogram["bounds"])
-    widths = bins[1:] - bins[:-1]
-    heights = weights.astype(np.float) / widths
-
-    ax = pyplot.axes()
-    return ax.fill_between(
-            bins.repeat(2)[1:-1], heights.repeat(2),
-            color=color)
-
-def next_frame_server(i, generator):
-    return generator.next()
-
 def interact_with_server():
     if args.list:
         request = DynamicDensity_pb2.RPCQueryParams()
@@ -357,27 +289,7 @@ def interact_with_server():
 
 
 if __name__ == "__main__":
-    if args.stdin:
-        data = sys.stdin.read()
-
-        hists = extract_histograms(data)
-        title = None
-
-        for hist in hists:
-            if check_histogram(hist):
-                label = hist.get("label", "")
-
-                if hist.get("title"):
-                    title = hist.get("title")
-
-                prepare_render_hist(hist, label=label, alpha=1.0 / len(hists))
-
-        pyplot.legend()
-        if title:
-            pyplot.title(title)
-        pyplot.show()
-
-    elif args.proto:
+    if args.proto:
         if args.proto.startswith('/'):
             path = args.proto
         else:

@@ -1,0 +1,17 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_binary(
+    name = "run_malloc",
+    srcs = ["run_malloc.cpp"],
+    deps = [
+        "@dynamic_density_map//:density_map_server",
+        "@dynamic_density_map//:dynamic_histogram",
+        "@dynamic_density_map//:dynamic_kde",
+        "@dynamic_density_map//:dynamic_kde_2d",
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+)

@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2020 Logan Evans
+// Copyright (c) 2021 Logan Evans
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -396,10 +396,19 @@ class DynamicKDE : public DensityMapBase {
         num_splits++;
       }
     } else {
+      double mean_left = kernels_[kx - 1].mean();
+      double mean_right = kernels_[kx].mean();
+      double count_left;
+      if (mean_left < mean_right) {
+        count_left = (val - mean_left) / (mean_right - mean_left);
+      } else {
+        count_left = 0.5;
+      }
+
       kernels_[kx].decay(
           description().decay_factor(generation_ - kernels_[kx].generation()),
           generation_);
-      kernels_[kx].addValue(val, 0.5);
+      kernels_[kx].addValue(val, 1.0 - count_left);
       if (kernels_[kx].count() > splitThreshold()) {
         split(kx);
         num_splits++;
@@ -408,7 +417,7 @@ class DynamicKDE : public DensityMapBase {
       kernels_[kx - 1].decay(description().decay_factor(
                                  generation_ - kernels_[kx - 1].generation()),
                              generation_);
-      kernels_[kx - 1].addValue(val, 0.5);
+      kernels_[kx - 1].addValue(val, count_left);
       if (kernels_[kx - 1].count() > splitThreshold()) {
         split(kx - 1);
         num_splits++;
