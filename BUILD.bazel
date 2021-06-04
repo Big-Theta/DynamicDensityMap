@@ -10,7 +10,6 @@ cc_library(
     hdrs = ["DensityMapDescription.h"],
     deps = [
         ":dynamic_density_cc_proto",
-        ":timestamp_cc_proto",
     ],
     copts = [
         "-std=c++17",
@@ -23,7 +22,6 @@ cc_library(
     deps = [
         ":density_map_description",
         ":dynamic_density_cc_proto",
-        ":timestamp_cc_proto",
         ":insertion_buffer",
     ],
     copts = [
@@ -39,7 +37,6 @@ cc_library(
         ":density_map_base",
         ":density_map_description",
         ":dynamic_density_cc_proto",
-        ":timestamp_cc_proto",
         ":insertion_buffer",
     ],
     copts = [
@@ -68,7 +65,6 @@ cc_library(
         ":density_map_base",
         ":density_map_description",
         ":dynamic_density_cc_proto",
-        ":timestamp_cc_proto",
         ":insertion_buffer",
     ],
     copts = [
@@ -97,7 +93,6 @@ cc_library(
         ":density_map_base",
         ":density_map_description",
         ":dynamic_density_cc_proto",
-        ":timestamp_cc_proto",
         ":insertion_buffer",
     ],
     copts = [
@@ -142,11 +137,6 @@ proto_library(
 cc_proto_library(
     name = "dynamic_density_cc_proto",
     deps = [":dynamic_density_proto"],
-)
-
-cc_proto_library(
-    name = "timestamp_cc_proto",
-    deps = ["@protobuf//:timestamp_proto"],
 )
 
 py_proto_library(

@@ -30,7 +30,6 @@ namespace dyden {
 
 using ::dynamic_density::DensityMapIdentifier;
 using ::dynamic_density::DensityMapDescription;
-using ::google::protobuf::Timestamp;
 
 class Identifier {
  public:

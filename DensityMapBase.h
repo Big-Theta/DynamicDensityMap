@@ -29,7 +29,6 @@
 namespace dyden {
 
 using ::dynamic_density::DensityMap;
-using ::google::protobuf::Timestamp;
 
 class DensityMapBase {
  public:

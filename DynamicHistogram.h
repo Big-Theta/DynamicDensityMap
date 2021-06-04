@@ -39,7 +39,6 @@
 namespace dyden {
 
 using ::dynamic_density::DensityMap;
-using ::google::protobuf::Timestamp;
 
 bool in_range(double val, double a, double b) {
   return ((val <= a) ^ (val <= b)) || val == a || val == b;
