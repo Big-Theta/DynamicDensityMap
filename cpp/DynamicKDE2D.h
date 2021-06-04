@@ -258,10 +258,10 @@ class DynamicKDE2DOpts {
 class DynamicKDE2D {
  public:
   DynamicKDE2D(const DynamicKDE2DOpts& opts)
-      : refresh_interval_(opts.refresh_interval()),
-        description_(DescriptionOpts()
+      : description_(DescriptionOpts()
                          .set_type(MapType::KDE2D)
                          .set_decay_rate(opts.decay_rate())
+                         .set_refresh_interval(opts.refresh_interval())
                          .set_title(opts.title())
                          .set_labels(opts.labels())),
         generation_(0),
@@ -271,20 +271,11 @@ class DynamicKDE2D {
         insertion_buffer_(/*buffer_size=*/2 * opts.refresh_interval()) {
     kernels_.reserve(opts.num_kernels() + 2);
     kernels_.resize(opts.num_kernels());
-
-    if (opts.decay_rate() != 0.0) {
-      decay_factors_.resize(refresh_interval_);
-      double decay = 1.0;
-      for (size_t i = 0; i < refresh_interval_; i++) {
-        decay_factors_[i] = decay;
-        decay *= 1.0 - opts.decay_rate();
-      }
-    }
   }
 
   void addValue(double x, double y) {
     size_t unflushed = insertion_buffer_.addValue(std::make_pair(x, y));
-    if (2 * unflushed >= refresh_interval_) {
+    if (unflushed >= description().refresh_interval()) {
       auto flush_it = insertion_buffer_.lockedIterator();
       flush(&flush_it);
     }
@@ -343,8 +334,6 @@ class DynamicKDE2D {
   }
 
  private:
-  const size_t refresh_interval_;
-
   Description description_;
 
   uint64_t generation_;
@@ -354,7 +343,6 @@ class DynamicKDE2D {
 
   InsertionBuffer<std::pair<double, double>> insertion_buffer_;
   std::vector<Kernel2D> kernels_;
-  std::vector<double> decay_factors_;
 
   double splitThreshold() const { return split_threshold_; }
 
@@ -407,7 +395,9 @@ class DynamicKDE2D {
     std::sort(best_kxs.begin(), best_kxs.end());
     for (auto kx_it = best_kxs.rbegin(); kx_it != best_kxs.rend(); ++kx_it) {
       auto* kernel = &kernels_[*kx_it];
-      kernel->decay(decay_factor(kernel->generation()), generation_);
+      kernel->decay(
+          description().decay_factor(generation_ - kernel->generation()),
+          generation_);
       kernel->addValue(val.first, val.second, 0.25);
       if (kernel->count() > splitThreshold()) {
         split(*kx_it);
@@ -426,15 +416,6 @@ class DynamicKDE2D {
     }
   }
 
-  double decay_factor(uint64_t kernel_generation) const {
-    if (decay_rate() == 0.0) {
-      return 1.0;
-    }
-    uint64_t generations = generation_ - kernel_generation;
-    assert(generations < decay_factors_.size());
-    return decay_factors_[generations];
-  }
-
   void refresh() {
     if (refresh_generation_ == generation_) {
       return;
@@ -444,7 +425,9 @@ class DynamicKDE2D {
     double max_count = 0.0;
     total_count_ = 0.0;
     for (size_t kx = 0; kx < kernels_.size(); kx++) {
-      kernels_[kx].decay(decay_factor(kernels_[kx].generation()), generation_);
+      kernels_[kx].decay(
+          description().decay_factor(generation_ - kernels_[kx].generation()),
+          generation_);
       double count = kernels_[kx].count();
       total_count_ += count;
       if (count < min_count) {

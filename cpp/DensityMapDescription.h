@@ -58,6 +58,7 @@ class DescriptionOpts {
   DescriptionOpts()
       : type_(MapType::UNKNOWN),
         decay_rate_(0.0),
+        refresh_interval_(512),
         title_("title"),
         labels_({""}) {}
 
@@ -72,6 +73,12 @@ class DescriptionOpts {
     return *this;
   }
   double decay_rate() const { return decay_rate_; }
+
+  DescriptionOpts& set_refresh_interval(size_t refresh_interval) {
+    refresh_interval_ = refresh_interval;
+    return *this;
+  }
+  size_t refresh_interval() const { return refresh_interval_; }
 
   DescriptionOpts& set_title(std::string title) {
     title_ = title;
@@ -88,6 +95,7 @@ class DescriptionOpts {
  private:
   MapType type_;
   double decay_rate_;
+  size_t refresh_interval_;
   std::string title_;
   std::vector<std::string> labels_;
 };
@@ -96,14 +104,14 @@ class Description {
  public:
   Description(const DescriptionOpts& opts)
       : title_(opts.title()),
-        decay_rate_(opts.decay_rate()),
-        type_(opts.type()) {}
+        refresh_interval_(opts.refresh_interval()),
+        type_(opts.type()) {
+    set_decay_rate(opts.decay_rate());
+  }
 
   const Identifier& identifier() const { return identifier_; }
 
   void setFromProto(const DensityMapDescription& proto) {
-    printf("> setFromProto(%s)\n", proto.DebugString().c_str());
-
     title_ = proto.title();
 
     labels_.clear();
@@ -112,8 +120,6 @@ class Description {
     }
 
     decay_rate_ = proto.decay_rate();
-
-    printf("< %s\n", asProto().DebugString().c_str());
   }
 
   const std::string& title() const { return title_; }
@@ -123,7 +129,18 @@ class Description {
   void set_labels(std::vector<std::string> labels) { labels_ = labels; }
 
   double decay_rate() const { return decay_rate_; }
-  void set_decay_rate(double decay_rate) { decay_rate_ = decay_rate; }
+  void set_decay_rate(double rate) {
+    decay_rate_ = rate;
+    // Keep this in line with the size of the InsertionBuffer.
+    decay_factors_.resize(2 * refresh_interval());
+    double decay = 1.0;
+    for (size_t i = 0; i < refresh_interval(); i++) {
+      decay_factors_[i] = decay;
+      decay *= 1.0 - rate;
+    }
+  }
+
+  size_t refresh_interval() const { return refresh_interval_; }
 
   DensityMapDescription asProto() const {
     DensityMapDescription desc;
@@ -173,12 +190,26 @@ class Description {
   }
 
  protected:
+  friend class DensityMapBase;
   friend class DynamicHistogram;
   friend class DynamicKDE;
-  friend class DynamicKDE2d;
+  friend class DynamicKDE2D;
 
   void setIdentity(int32_t identity) {
     identifier_.setIdentity(identity);
+  }
+
+  double decay_factor(uint64_t generations) const {
+    if (decay_rate() == 0.0) {
+      return 1.0;
+    }
+    if (generations >= decay_factors_.size()) {
+      setbuf(stdout, 0);
+      printf("??? generations: %ld, size: %zu, interval: %zu\n", generations,
+             decay_factors_.size(), refresh_interval_);
+    }
+    assert(generations < decay_factors_.size());
+    return decay_factors_[generations];
   }
 
  private:
@@ -186,7 +217,13 @@ class Description {
   std::string title_;
   std::vector<std::string> labels_;
   double decay_rate_;
+  size_t refresh_interval_;
   MapType type_;
+
+  std::vector<double> decay_factors_;
+
+  void initDecayFactors() {
+  }
 };
 
 }  // namespace dyden

@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "DynamicDensity.pb.h"
+#include "cpp/DensityMapBase.h"
 #include "cpp/DensityMapDescription.h"
 #include "cpp/InsertionBuffer.h"
 
@@ -110,15 +111,15 @@ class DynamicHistogramOpts {
   std::string label_;
 };
 
-class DynamicHistogram {
+class DynamicHistogram : public DensityMapBase {
  public:
   DynamicHistogram(const DynamicHistogramOpts& opts)
-      : refresh_interval_(opts.refresh_interval()),
-        description_(DescriptionOpts()
-                         .set_type(MapType::HISTOGRAM)
-                         .set_decay_rate(opts.decay_rate())
-                         .set_title(opts.title())
-                         .set_labels({opts.label()})),
+      : DensityMapBase(DescriptionOpts()
+                           .set_type(MapType::HISTOGRAM)
+                           .set_decay_rate(opts.decay_rate())
+                           .set_refresh_interval(opts.refresh_interval())
+                           .set_title(opts.title())
+                           .set_labels({opts.label()})),
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
@@ -128,22 +129,13 @@ class DynamicHistogram {
     ubounds_.back() = std::numeric_limits<double>::max();
     counts_.resize(opts.num_buckets());
     bucket_generation_.resize(opts.num_buckets());
-
-    if (opts.decay_rate() != 0.0) {
-      decay_factors_.resize(refresh_interval_);
-      double decay = 1.0;
-      for (size_t i = 0; i < refresh_interval_; i++) {
-        decay_factors_[i] = decay;
-        decay *= 1.0 - opts.decay_rate();
-      }
-    }
   }
 
   virtual ~DynamicHistogram() {}
 
   void addValue(double val) {
     size_t unflushed = insertion_buffer_.addValue(val);
-    if (unflushed >= refresh_interval_) {
+    if (unflushed >= description().refresh_interval()) {
       auto flush_it = insertion_buffer_.lockedIterator();
       flush(&flush_it);
     }
@@ -291,12 +283,6 @@ class DynamicHistogram {
     return count / computeTotalCount();
   }
 
-  void trackQuantiles(const std::vector<double>& quantiles) {}
-
-  std::map<double, double> getTrackedQuantiles() const {
-    return std::map<double, double>();
-  }
-
   std::string debugString() {
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
@@ -345,17 +331,13 @@ class DynamicHistogram {
     return s;
   }
 
-  const Description& description() const { return description_; }
-
-  Description* mutable_description() { return &description_; }
-
-  DensityMap asProto() {
+  DensityMap asProto() override {
     DensityMap dm;
     toProto(&dm);
     return dm;
   }
 
-  void toProto(DensityMap* proto) {
+  void toProto(DensityMap* proto) override {
     auto* dhist = proto->mutable_dynamic_histogram();
 
     auto* desc = dhist->mutable_description();
@@ -376,10 +358,6 @@ class DynamicHistogram {
   }
 
  protected:
-  const size_t refresh_interval_;
-
-  Description description_;
-
   uint64_t generation_;
   uint64_t refresh_generation_;
   double total_count_;
@@ -395,7 +373,6 @@ class DynamicHistogram {
   std::vector<uint64_t> bucket_generation_;
   std::vector<double> quantiles_;
   std::vector<double> quantile_locations_;
-  std::vector<double> decay_factors_;
 
   void setIdentity(int32_t identity) {
     mutable_description()->setIdentity(identity);
@@ -427,10 +404,6 @@ class DynamicHistogram {
       total_count_ = generation_;
     }
 
-    if (generation_ - refresh_generation_ + 1 == refresh_interval_) {
-      refresh();
-    }
-
     if (counts_[bx] < splitThreshold()) {
       return;
     }
@@ -441,19 +414,12 @@ class DynamicHistogram {
     merge();
   }
 
-  double countAfterDecay(double original, uint64_t generations) {
-    if (decay_rate() == 0.0) {
-      return original;
-    }
-    return original * decay_factors_[generations];
-  }
-
   void decay(size_t bx) {
     if (decay_rate() == 0.0) {
       return;
     }
-    counts_[bx] =
-        countAfterDecay(counts_[bx], generation_ - bucket_generation_[bx]);
+    counts_[bx] *=
+        description().decay_factor(generation_ - bucket_generation_[bx]);
     bucket_generation_[bx] = generation_;
   }
 

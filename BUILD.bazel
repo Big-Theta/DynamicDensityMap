@@ -18,9 +18,24 @@ cc_library(
 )
 
 cc_library(
+    name = "density_map_base",
+    hdrs = ["cpp/DensityMapBase.h"],
+    deps = [
+        ":density_map_description",
+        "dynamic_density_cc_proto",
+        ":timestamp_cc_proto",
+        ":insertion_buffer",
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+)
+
+cc_library(
     name = "dynamic_histogram",
     hdrs = ["cpp/DynamicHistogram.h"],
     deps = [
+        ":density_map_base",
         ":density_map_description",
         ":dynamic_density_cc_proto",
         ":timestamp_cc_proto",
