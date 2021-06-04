@@ -41,7 +41,7 @@ class Identifier {
  protected:
   friend class Description;
 
-  void setIdentity(int32_t identity) {
+  void set_identity(int32_t identity) {
     identity_ = identity;
   }
 
@@ -130,7 +130,6 @@ class Description {
 
   double decay_rate() const { return decay_rate_; }
   void set_decay_rate(double rate) {
-    decay_rate_ = rate;
     // Keep this in line with the size of the InsertionBuffer.
     decay_factors_.resize(2 * refresh_interval());
     double decay = 1.0;
@@ -138,6 +137,7 @@ class Description {
       decay_factors_[i] = decay;
       decay *= 1.0 - rate;
     }
+    decay_rate_ = rate;
   }
 
   size_t refresh_interval() const { return refresh_interval_; }
@@ -191,18 +191,16 @@ class Description {
 
  protected:
   friend class DensityMapBase;
+  friend class DensityMapRegistry;
   friend class DynamicHistogram;
   friend class DynamicKDE;
   friend class DynamicKDE2D;
 
-  void setIdentity(int32_t identity) {
-    identifier_.setIdentity(identity);
+  void set_identity(int32_t identity) {
+    identifier_.set_identity(identity);
   }
 
   double decay_factor(uint64_t generations) const {
-    if (decay_rate() == 0.0) {
-      return 1.0;
-    }
     if (generations >= decay_factors_.size()) {
       setbuf(stdout, 0);
       printf("??? generations: %ld, size: %zu, interval: %zu\n", generations,

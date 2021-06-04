@@ -71,7 +71,8 @@ class DynamicHistogramOpts {
         decay_rate_(0.0),
         refresh_interval_(512),
         title_("title"),
-        label_("label") {}
+        label_("label"),
+        register_with_server_(false) {}
 
   DynamicHistogramOpts& set_num_buckets(size_t num_buckets) {
     num_buckets_ = num_buckets;
@@ -103,12 +104,21 @@ class DynamicHistogramOpts {
   }
   std::string label() const { return label_; }
 
+  DynamicHistogramOpts& set_register_with_server(bool register_with_server) {
+    register_with_server_ = register_with_server;
+    return *this;
+  }
+  bool register_with_server() const {
+    return register_with_server_;
+  }
+
  private:
   size_t num_buckets_;
   double decay_rate_;
   size_t refresh_interval_;
   std::string title_;
   std::string label_;
+  bool register_with_server_;
 };
 
 class DynamicHistogram : public DensityMapBase {
@@ -129,6 +139,9 @@ class DynamicHistogram : public DensityMapBase {
     ubounds_.back() = std::numeric_limits<double>::max();
     counts_.resize(opts.num_buckets());
     bucket_generation_.resize(opts.num_buckets());
+    if (opts.register_with_server()) {
+      registerWithServer();
+    }
   }
 
   virtual ~DynamicHistogram() {}
@@ -357,6 +370,10 @@ class DynamicHistogram : public DensityMapBase {
     }
   }
 
+  void registerWithServer() override {
+    DensityMapRegistry::getInstance().registerDensityMap(this);
+  }
+
  protected:
   uint64_t generation_;
   uint64_t refresh_generation_;
@@ -373,10 +390,6 @@ class DynamicHistogram : public DensityMapBase {
   std::vector<uint64_t> bucket_generation_;
   std::vector<double> quantiles_;
   std::vector<double> quantile_locations_;
-
-  void setIdentity(int32_t identity) {
-    mutable_description()->setIdentity(identity);
-  }
 
   double splitThreshold() const { return split_threshold_; }
 
@@ -415,11 +428,12 @@ class DynamicHistogram : public DensityMapBase {
   }
 
   void decay(size_t bx) {
+    uint64_t old_generation = bucket_generation_[bx];
+    bucket_generation_[bx] = generation_;
     if (decay_rate() == 0.0) {
       return;
     }
-    counts_[bx] *=
-        description().decay_factor(generation_ - bucket_generation_[bx]);
+    counts_[bx] *= description().decay_factor(generation_ - old_generation);
     bucket_generation_[bx] = generation_;
   }
 

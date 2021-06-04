@@ -30,9 +30,10 @@ message DensityMapIdentifier {
 
 message DensityMapDescription {
   enum Type {
-    HISTOGRAM = 0;
-    KDE = 1;
-    KDE2D = 2;
+    UNKNOWN = 0;
+    HISTOGRAM = 1;
+    KDE = 2;
+    KDE2D = 3;
   }
 
   DensityMapIdentifier identifier = 1;

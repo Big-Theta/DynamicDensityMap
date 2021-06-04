@@ -19,29 +19,26 @@ int main() {
   void* ptrs[kNumPtrs];
   memset(ptrs, 0, sizeof(void*) * kNumPtrs);
 
-  dyden::DynamicHistogram dynamic_histogram(dyden::DynamicHistogramOpts()
-                                                .set_num_buckets(100)
-                                                .set_decay_rate(0.00001)
-                                                .set_title("malloc")
-                                                .set_label("log(cycles)"));
-  dyden::DensityMapRegistry::getInstance().registerDynamicHistogram(
-      &dynamic_histogram);
-
+  dyden::DynamicHistogram dynamic_histogram(
+      dyden::DynamicHistogramOpts()
+          .set_num_buckets(100)
+          .set_decay_rate(0.00001)
+          .set_title("malloc")
+          .set_label("log(cycles)")
+          .set_register_with_server(true));
   dyden::DynamicKDE dynamic_kde(dyden::DynamicKDEOpts()
-                                                .set_num_kernels(100)
-                                                .set_decay_rate(0.00001)
-                                                .set_title("malloc")
-                                                .set_label("log(cycles)"));
-  dyden::DensityMapRegistry::getInstance().registerDynamicKDE(&dynamic_kde);
-
+                                    .set_num_kernels(100)
+                                    .set_decay_rate(0.00001)
+                                    .set_title("malloc")
+                                    .set_label("log(cycles)")
+                                    .set_register_with_server(true));
   dyden::DynamicKDE2D dynamic_kde_2d(
       dyden::DynamicKDE2DOpts()
           .set_num_kernels(100)
           .set_decay_rate(0.00001)
           .set_title("malloc")
-          .set_labels({"log(cycles)", "log(size)"}));
-  dyden::DensityMapRegistry::getInstance().registerDynamicKDE2D(
-      &dynamic_kde_2d);
+          .set_labels({"log(cycles)", "log(size)"})
+          .set_register_with_server(true));
 
   std::default_random_engine gen;
   std::uniform_int_distribution<size_t> ptr_idx_dist(0, kNumPtrs - 1);

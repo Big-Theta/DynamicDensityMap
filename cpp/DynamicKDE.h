@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "DynamicDensity.pb.h"
+#include "cpp/DensityMapBase.h"
 #include "cpp/DensityMapDescription.h"
 #include "cpp/InsertionBuffer.h"
 
@@ -174,7 +175,8 @@ class DynamicKDEOpts {
         decay_rate_(0.0),
         refresh_interval_(512),
         title_("title"),
-        label_("label") {}
+        label_("label"),
+        register_with_server_(false) {}
 
   DynamicKDEOpts& set_num_kernels(size_t num_kernels) {
     num_kernels_ = num_kernels;
@@ -206,23 +208,32 @@ class DynamicKDEOpts {
   }
   std::string label() const { return label_; }
 
+  DynamicKDEOpts& set_register_with_server(bool register_with_server) {
+    register_with_server_ = register_with_server;
+    return *this;
+  }
+  bool register_with_server() const {
+    return register_with_server_;
+  }
+
  private:
   size_t num_kernels_;
   double decay_rate_;
   size_t refresh_interval_;
   std::string title_;
   std::string label_;
+  bool register_with_server_;
 };
 
-class DynamicKDE {
+class DynamicKDE : public DensityMapBase {
  public:
   DynamicKDE(const DynamicKDEOpts& opts)
-      : description_(DescriptionOpts()
-                         .set_type(MapType::KDE)
-                         .set_decay_rate(opts.decay_rate())
-                         .set_refresh_interval(opts.refresh_interval())
-                         .set_title(opts.title())
-                         .set_labels({opts.label()})),
+      : DensityMapBase(DescriptionOpts()
+                           .set_type(MapType::KDE)
+                           .set_decay_rate(opts.decay_rate())
+                           .set_refresh_interval(opts.refresh_interval())
+                           .set_title(opts.title())
+                           .set_labels({opts.label()})),
         generation_(0),
         refresh_generation_(0),
         total_count_(0.0),
@@ -230,6 +241,9 @@ class DynamicKDE {
         insertion_buffer_(/*buffer_size=*/2 * opts.refresh_interval()) {
     kernels_.reserve(opts.num_kernels() + 2);
     kernels_.resize(opts.num_kernels());
+    if (opts.register_with_server()) {
+      registerWithServer();
+    }
   }
 
   void addValue(double val) {
@@ -311,10 +325,6 @@ class DynamicKDE {
     return s;
   }
 
-  const Description& description() const { return description_; }
-
-  Description* mutable_description() { return &description_; }
-
   DensityMap asProto() {
     DensityMap dm;
     toProto(&dm);
@@ -325,7 +335,7 @@ class DynamicKDE {
     auto* dkde = proto->mutable_dynamic_kde();
 
     auto* desc = dkde->mutable_description();
-    description_.toProto(desc);
+    description().toProto(desc);
 
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
@@ -336,9 +346,11 @@ class DynamicKDE {
     }
   }
 
- private:
-  Description description_;
+  void registerWithServer() override {
+    DensityMapRegistry::getInstance().registerDensityMap(this);
+  }
 
+ private:
   uint64_t generation_;
   uint64_t refresh_generation_;
   double total_count_;
@@ -349,7 +361,7 @@ class DynamicKDE {
 
   double splitThreshold() const { return split_threshold_; }
 
-  double decay_rate() const { return description_.decay_rate(); }
+  double decay_rate() const { return description().decay_rate(); }
 
   void flush(FlushIterator<double>* flush_it) {
     for (; *flush_it; ++(*flush_it)) {

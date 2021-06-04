@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "DynamicDensity.pb.h"
+#include "cpp/DensityMapBase.h"
 #include "cpp/DensityMapDescription.h"
 #include "cpp/InsertionBuffer.h"
 
@@ -215,7 +216,8 @@ class DynamicKDE2DOpts {
         decay_rate_(0.0),
         refresh_interval_(512),
         title_("title"),
-        labels_({"x-label", "y-label"}) {}
+        labels_({"x-label", "y-label"}),
+        register_with_server_(false) {}
 
   DynamicKDE2DOpts& set_num_kernels(size_t num_kernels) {
     num_kernels_ = num_kernels;
@@ -247,18 +249,27 @@ class DynamicKDE2DOpts {
   }
   std::vector<std::string> labels() const { return labels_; }
 
+  DynamicKDE2DOpts& set_register_with_server(bool register_with_server) {
+    register_with_server_ = register_with_server;
+    return *this;
+  }
+  bool register_with_server() const {
+    return register_with_server_;
+  }
+
  private:
   size_t num_kernels_;
   double decay_rate_;
   size_t refresh_interval_;
   std::string title_;
   std::vector<std::string> labels_;
+  bool register_with_server_;
 };
 
-class DynamicKDE2D {
+class DynamicKDE2D : public DensityMapBase {
  public:
   DynamicKDE2D(const DynamicKDE2DOpts& opts)
-      : description_(DescriptionOpts()
+      : DensityMapBase(DescriptionOpts()
                          .set_type(MapType::KDE2D)
                          .set_decay_rate(opts.decay_rate())
                          .set_refresh_interval(opts.refresh_interval())
@@ -271,6 +282,9 @@ class DynamicKDE2D {
         insertion_buffer_(/*buffer_size=*/2 * opts.refresh_interval()) {
     kernels_.reserve(opts.num_kernels() + 2);
     kernels_.resize(opts.num_kernels());
+    if (opts.register_with_server()) {
+      registerWithServer();
+    }
   }
 
   void addValue(double x, double y) {
@@ -304,14 +318,6 @@ class DynamicKDE2D {
     return s;
   }
 
-  const Description& description() const {
-    return description_;
-  }
-
-  Description* mutable_description() {
-    return &description_;
-  }
-
   DensityMap asProto() {
     DensityMap dm;
     toProto(&dm);
@@ -322,7 +328,7 @@ class DynamicKDE2D {
     auto* dkde2d = proto->mutable_dynamic_kde();
 
     auto *desc = dkde2d->mutable_description();
-    description_.toProto(desc);
+    description().toProto(desc);
 
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
@@ -333,9 +339,11 @@ class DynamicKDE2D {
     }
   }
 
- private:
-  Description description_;
+  void registerWithServer() override {
+    DensityMapRegistry::getInstance().registerDensityMap(this);
+  }
 
+ private:
   uint64_t generation_;
   uint64_t refresh_generation_;
   double total_count_;
@@ -347,7 +355,7 @@ class DynamicKDE2D {
   double splitThreshold() const { return split_threshold_; }
 
   double decay_rate() const {
-    return description_.decay_rate();
+    return description().decay_rate();
   }
 
   void flush(FlushIterator<std::pair<double, double>>* flush_it) {

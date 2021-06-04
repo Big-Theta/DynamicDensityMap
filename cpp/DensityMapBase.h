@@ -38,6 +38,7 @@ class DensityMapBase {
 
   virtual DensityMap asProto() = 0;
   virtual void toProto(DensityMap* proto) = 0;
+  virtual void registerWithServer() = 0;
 
   const Description& description() const { return description_; }
 

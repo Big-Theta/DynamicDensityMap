@@ -33,9 +33,7 @@
 
 #include "DynamicDensity.grpc.pb.h"
 #include "DynamicDensity.pb.h"
-#include "cpp/DynamicHistogram.h"
-#include "cpp/DynamicKDE.h"
-#include "cpp/DynamicKDE2D.h"
+#include "cpp/DensityMapBase.h"
 
 namespace dyden {
 
@@ -56,55 +54,31 @@ class DensityMapRegistry {
   DensityMapRegistry(DensityMapRegistry const&) = delete;
   void operator=(DensityMapRegistry const&) = delete;
 
-  void registerDynamicHistogram(DynamicHistogram* hist) {
+  void registerDensityMap(DensityMapBase* density_map) {
     std::scoped_lock l(mutex_);
-    dhists_.emplace_back(hist);
-  }
-
-  void registerDynamicKDE(DynamicKDE* kde) {
-    std::scoped_lock l(mutex_);
-    dkdes_.emplace_back(kde);
-  }
-
-  void registerDynamicKDE2D(DynamicKDE2D* kde2d) {
-    std::scoped_lock l(mutex_);
-    dkde2ds_.emplace_back(kde2d);
+    density_map->mutable_description()->set_identity(next_identity_++);
+    density_maps_.emplace_back(density_map);
   }
 
   void ListDensityMaps(const ::dynamic_density::ListDensityMapsParams& request,
                       ::dynamic_density::ListDensityMapsResult* reply) {
-    for (auto& hist : dhists_) {
-      Description::copyToProto(
-          hist->asProto().dynamic_histogram().description(),
-          reply->add_descriptions());
-    }
-    for (auto& kde : dkdes_) {
-      Description::copyToProto(kde->asProto().dynamic_kde().description(),
-                               reply->add_descriptions());
-    }
-    for (auto& kde2d : dkde2ds_) {
-      Description::copyToProto(kde2d->asProto().dynamic_kde().description(),
-                               reply->add_descriptions());
+    for (auto* density_map : density_maps_) {
+      ::dynamic_density::DensityMap dmap = density_map->asProto();
+      if (dmap.has_dynamic_histogram()) {
+        Description::copyToProto(dmap.dynamic_histogram().description(),
+                                 reply->add_descriptions());
+      } else {
+        Description::copyToProto(dmap.dynamic_kde().description(),
+                                 reply->add_descriptions());
+      }
     }
   }
 
   Status GetDensityMap(const DensityMapIdentifier& request, DensityMap* reply) {
     int32_t id = request.identity();
-    for (auto& hist : dhists_) {
-      if (hist->description().identifier().identity() == id) {
-        hist->toProto(reply);
-        return Status::OK;
-      }
-    }
-    for (auto& kde : dkdes_) {
-      if (kde->description().identifier().identity() == id) {
-        kde->toProto(reply);
-        return Status::OK;
-      }
-    }
-    for (auto& kde2d : dkde2ds_) {
-      if (kde2d->description().identifier().identity() == id) {
-        kde2d->toProto(reply);
+    for (auto* density_map : density_maps_) {
+      if (density_map->description().identifier().identity() == id) {
+        density_map->toProto(reply);
         return Status::OK;
       }
     }
@@ -115,26 +89,10 @@ class DensityMapRegistry {
   Status SetDensityMapOptions(const DensityMapDescription& request,
                               DensityMapDescription* reply) {
     int32_t id = request.identifier().identity();
-    printf("> SetDensityMapOptions -- %d\n", id);
-    for (auto& hist : dhists_) {
-      if (hist->description().identifier().identity() == id) {
-        hist->mutable_description()->setFromProto(request);
-        hist->description().toProto(reply);
-        return Status::OK;
-      }
-    }
-    for (auto& kde : dkdes_) {
-      if (kde->description().identifier().identity() == id) {
-        kde->mutable_description()->setFromProto(request);
-        kde->description().toProto(reply);
-        return Status::OK;
-      }
-    }
-    for (auto& kde2d : dkde2ds_) {
-      if (kde2d->description().identifier().identity() == id) {
-        printf(". SetDensityMapOptions -- found\n");
-        kde2d->mutable_description()->setFromProto(request);
-        kde2d->description().toProto(reply);
+    for (auto* density_map : density_maps_) {
+      if (density_map->description().identifier().identity() == id) {
+        density_map->mutable_description()->setFromProto(request);
+        density_map->description().toProto(reply);
         return Status::OK;
       }
     }
@@ -147,9 +105,7 @@ class DensityMapRegistry {
 
   std::thread server_thread_;
   std::mutex mutex_;
-  std::vector<std::unique_ptr<DynamicHistogram>> dhists_;
-  std::vector<std::unique_ptr<DynamicKDE>> dkdes_;
-  std::vector<std::unique_ptr<DynamicKDE2D>> dkde2ds_;
+  std::vector<DensityMapBase*> density_maps_;
   int32_t next_identity_;
 };
 
@@ -215,8 +171,6 @@ class DynamicDensityServiceImpl final
               reply_.mutable_density_map_result());
         } else {
           assert(request_.has_set_density_map_description());
-          printf("> set_density_map_description(): %s\n",
-                 request_.DebugString().c_str());
           DensityMapRegistry::getInstance().SetDensityMapOptions(
               request_.set_density_map_description(),
               reply_.mutable_density_map_description());
