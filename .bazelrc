@@ -1,3 +1,5 @@
+build --repo_env=CC=clang
+
 build:asan --strip=never
 build:asan --copt -fsanitize=address
 build:asan --copt -DADDRESS_SANITIZER

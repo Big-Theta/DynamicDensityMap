@@ -7,7 +7,7 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "density_map_description",
-    hdrs = ["cpp/DensityMapDescription.h"],
+    hdrs = ["DensityMapDescription.h"],
     deps = [
         ":dynamic_density_cc_proto",
         ":timestamp_cc_proto",
@@ -19,10 +19,10 @@ cc_library(
 
 cc_library(
     name = "density_map_base",
-    hdrs = ["cpp/DensityMapBase.h"],
+    hdrs = ["DensityMapBase.h"],
     deps = [
         ":density_map_description",
-        "dynamic_density_cc_proto",
+        ":dynamic_density_cc_proto",
         ":timestamp_cc_proto",
         ":insertion_buffer",
     ],
@@ -33,7 +33,7 @@ cc_library(
 
 cc_library(
     name = "dynamic_histogram",
-    hdrs = ["cpp/DynamicHistogram.h"],
+    hdrs = ["DynamicHistogram.h"],
     deps = [
         ":density_map_server",
         ":density_map_base",
@@ -49,7 +49,7 @@ cc_library(
 
 cc_test(
     name = "dynamic_histogram_test",
-    srcs = ["cpp/DynamicHistogramTest.cpp"],
+    srcs = ["DynamicHistogramTest.cpp"],
     deps = [
         ":dynamic_density_cc_proto",
         ":dynamic_histogram",
@@ -63,7 +63,7 @@ cc_test(
 
 cc_library(
     name = "dynamic_kde",
-    hdrs = ["cpp/DynamicKDE.h"],
+    hdrs = ["DynamicKDE.h"],
     deps = [
         ":density_map_base",
         ":density_map_description",
@@ -78,7 +78,7 @@ cc_library(
 
 cc_test(
     name = "dynamic_kde_test",
-    srcs = ["cpp/DynamicKDETest.cpp"],
+    srcs = ["DynamicKDETest.cpp"],
     deps = [
         ":dynamic_density_cc_proto",
         ":dynamic_kde",
@@ -92,7 +92,7 @@ cc_test(
 
 cc_library(
     name = "dynamic_kde_2d",
-    hdrs = ["cpp/DynamicKDE2D.h"],
+    hdrs = ["DynamicKDE2D.h"],
     deps = [
         ":density_map_base",
         ":density_map_description",
@@ -107,7 +107,7 @@ cc_library(
 
 cc_test(
     name = "dynamic_kde_2d_test",
-    srcs = ["cpp/DynamicKDE2DTest.cpp"],
+    srcs = ["DynamicKDE2DTest.cpp"],
     deps = [
         ":dynamic_density_cc_proto",
         ":dynamic_kde_2d",
@@ -121,7 +121,7 @@ cc_test(
 
 cc_binary(
     name = "dynamic_histogram_benchmark",
-    srcs = ["cpp/DynamicHistogramBenchmark.cpp"],
+    srcs = ["DynamicHistogramBenchmark.cpp"],
     deps = [
         ":dynamic_histogram",
         ":dynamic_kde",
@@ -173,8 +173,8 @@ py_grpc_library(
 )
 
 py_binary(
-    name = "show_histogram",
-    srcs = ["show_histogram.py"],
+    name = "show_density_map",
+    srcs = ["show_density_map.py"],
     deps = [
         ":dynamic_density_py_grpc",
         ":dynamic_density_py_proto",
@@ -184,12 +184,12 @@ py_binary(
 
 cc_library(
     name = "insertion_buffer",
-    srcs = ["cpp/InsertionBuffer.h"],
+    srcs = ["InsertionBuffer.h"],
 )
 
 cc_test(
     name = "insertion_buffer_test",
-    srcs = ["cpp/InsertionBufferTest.cpp"],
+    srcs = ["InsertionBufferTest.cpp"],
     deps = [
         ":insertion_buffer",
         "@gtest//:gtest",
@@ -202,7 +202,7 @@ cc_test(
 
 cc_library(
     name = "density_map_server",
-    srcs = ["cpp/DensityMapServer.h"],
+    srcs = ["DensityMapServer.h"],
     deps = [
         ":density_map_description",
         ":dynamic_density_cc_proto",
@@ -217,7 +217,7 @@ cc_library(
 
 cc_binary(
     name = "run_malloc",
-    srcs = ["cpp/run_malloc.cpp"],
+    srcs = ["run_malloc.cpp"],
     deps = [
         ":density_map_server",
         ":dynamic_histogram",
