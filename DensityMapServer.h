@@ -118,14 +118,13 @@ class DynamicDensityServiceImpl final
     cq_->Shutdown();
   }
 
-  void Run() {
-    std::string server_address("0.0.0.0:50051");
+  void Run(std::string address) {
     ServerBuilder builder;
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.AddListeningPort(address, grpc::InsecureServerCredentials());
     builder.RegisterService(&service_);
     cq_ = builder.AddCompletionQueue();
     server_ = builder.BuildAndStart();
-    std::cout << "Server listening on " << server_address << std::endl;
+    std::cout << "Server listening on " << address << std::endl;
     HandleRpcs();
   }
 
@@ -236,8 +235,8 @@ class DynamicDensityServiceImpl final
 
 class DensityMapDaemon {
  public:
-  static DensityMapDaemon& startDaemon() {
-    static DensityMapDaemon instance;
+  static DensityMapDaemon& startDaemon(std::string address = "0.0.0.0:50051") {
+    static DensityMapDaemon instance(address);
     return instance;
   }
 
@@ -245,11 +244,11 @@ class DensityMapDaemon {
   void operator=(DensityMapDaemon const&) = delete;
 
  private:
-  DensityMapDaemon() {
+  DensityMapDaemon(std::string address) {
     static std::thread thread(
-        [](int i) {
+        [address](int i) {
           DynamicDensityServiceImpl server;
-          server.Run();
+          server.Run(address);
         },
         0);
     thread.detach();
