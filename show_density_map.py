@@ -20,6 +20,9 @@ parser.add_argument("--animate", action="store_true")
 parser.add_argument("--proto", type=str, default="")
 parser.add_argument("--server", type=str, default="0.0.0.0:50051")
 parser.add_argument(
+        "--print", action="store_true",
+        help="When used with --show, also print the proto.")
+parser.add_argument(
         "--list", action="store_true",
         help="List all density maps found on the server.")
 parser.add_argument(
@@ -275,6 +278,8 @@ def interact_with_server():
     request.get_map_with_identifier.identity = args.show
     result = query_server(request)
     ddens = result.density_map_result
+    if args.print:
+        print(ddens)
 
     if ddens.HasField("dynamic_histogram"):
         prepare_render_hist(ddens.dynamic_histogram)
