@@ -110,7 +110,7 @@ TEST(DynamicKDETest, addNoDecay) {
     uut.addValue(norm(gen));
   }
 
-  EXPECT_EQ(uut.computeTotalCount(), kNumValues);
+  EXPECT_NEAR(uut.computeTotalCount(), kNumValues, 1e-9);
   EXPECT_NEAR(uut.getQuantileEstimate(0.5), 0.0, 1e-1);
   EXPECT_NEAR(uut.getQuantileEstimate(0.05), -1.644854, 1e-1);
   EXPECT_NEAR(uut.getQuantileEstimate(0.95), 1.644854, 1e-1);
@@ -172,9 +172,10 @@ TEST(DynamicKDETest, count) {
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 
-  static constexpr int kNumValues = 1000000;
+  static constexpr int kNumValues = 10000;
   for (int i = 0; i < kNumValues; i++) {
     uut.addValue(norm(gen));
-    ASSERT_EQ(uut.computeTotalCount(), i + 1) << uut.debugString();
   }
+
+  ASSERT_EQ(uut.computeTotalCount(), kNumValues) << uut.debugString();
 }

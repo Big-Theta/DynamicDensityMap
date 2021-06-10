@@ -93,7 +93,7 @@ TEST(KernelTest, populateProto) {
 }
 
 TEST(DynamicKDE2DTest, addNoDecay) {
-  static constexpr int kNumValues = 1000000;
+  static constexpr int kNumValues = 10000;
   static constexpr double kDecayRate = 0.0;
   DynamicKDE2D uut(
       DynamicKDE2DOpts().set_num_kernels(200).set_decay_rate(kDecayRate));
@@ -106,28 +106,26 @@ TEST(DynamicKDE2DTest, addNoDecay) {
 
   for (int i = 0; i < kNumValues; i++) {
     switch (discrete(gen)) {
-    case 0:
-      uut.addValue(norm(gen), norm(gen));
-      break;
-    case 1:
-      uut.addValue(norm(gen) + 1, norm(gen) + 1);
-      break;
-    case 2:
-      uut.addValue(norm(gen) - 10, norm(gen) - 7);
-      break;
-    default:
-      uut.addValue(2 * unif(gen) + 10, 3 * unif(gen) + 10);
-      break;
+      case 0:
+        uut.addValue(norm(gen), norm(gen));
+        break;
+      case 1:
+        uut.addValue(norm(gen) + 1, norm(gen) + 1);
+        break;
+      case 2:
+        uut.addValue(norm(gen) - 10, norm(gen) - 7);
+        break;
+      default:
+        uut.addValue(2 * unif(gen) + 10, 3 * unif(gen) + 10);
+        break;
     }
     ASSERT_EQ(uut.computeTotalCount(), i + 1);
   }
 
-  printf("??? %s\n", uut.asProto().DebugString().c_str());
-
   EXPECT_EQ(uut.computeTotalCount(), kNumValues);
 
-  std::ofstream myfile("/tmp/DynamicKDE2D.pbuf");
-  ASSERT_TRUE(myfile.is_open());
-  ASSERT_TRUE(uut.asProto().SerializeToOstream(&myfile));
-  myfile.close();
+  // std::ofstream myfile("/tmp/DynamicKDE2D.pbuf");
+  // ASSERT_TRUE(myfile.is_open());
+  // ASSERT_TRUE(uut.asProto().SerializeToOstream(&myfile));
+  // myfile.close();
 }

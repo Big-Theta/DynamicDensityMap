@@ -14,35 +14,10 @@
 
 using dyden::DynamicHistogram;
 using dyden::DynamicHistogramOpts;
-using dyden::in_range;
 using dynamic_density::DensityMap;
 using testing::ContainerEq;
 using testing::Eq;
 using testing::Types;
-
-TEST(InRange, in_range) {
-  struct tcase {
-    double val;
-    double a;
-    double b;
-    bool in_range_expected;
-  };
-
-  std::vector<struct tcase> cases{
-      {0.0, -1.0, 1.0, true},  {0.0, 1.0, -1.0, true},
-      {1.0, 1.0, -1.0, true},  {1.0, -1.0, 1.0, true},
-      {-1.0, 1.0, -1.0, true}, {-1.0, -1.0, 1.0, true},
-      {2.0, 1.0, -1.0, false}, {-2.0, 1.0, -1.0, false},
-      {-1.0, 0.0, 0.0, false}, {1.0, 0.0, 0.0, false},
-      {0.0, 0.0, 0.0, true}};
-  for (auto tcase : cases) {
-    EXPECT_THAT(in_range(tcase.val, tcase.a, tcase.b),
-                Eq(tcase.in_range_expected))
-        << "in_range(" << tcase.val << ", " << tcase.a << ", " << tcase.b
-        << ") == " << in_range(tcase.val, tcase.a, tcase.b)
-        << "; expected = " << tcase.in_range_expected;
-  }
-}
 
 // From https://en.wikipedia.org/wiki/Geometric_series#Formula
 // Args:

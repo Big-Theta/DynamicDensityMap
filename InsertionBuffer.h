@@ -59,8 +59,11 @@ struct FlushIterator {
     if (ibuf_) {
       ibuf_->buffer_begin_ = idx_;
 
-      std::scoped_lock(ibuf_->insert_mu_);
-      ibuf_->unflushed_ -= processed_;
+      {
+        std::scoped_lock(ibuf_->insert_mu_);
+        ibuf_->unflushed_ -= processed_;
+      }
+
       ibuf_->flush_mu_.unlock();
     }
   }

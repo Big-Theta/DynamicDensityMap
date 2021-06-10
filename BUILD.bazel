@@ -7,12 +7,10 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "density_map_description",
+    srcs = ["DensityMapDescription.cpp"],
     hdrs = ["DensityMapDescription.h"],
     deps = [
         ":dynamic_density_cc_proto",
-    ],
-    copts = [
-        "-std=c++17",
     ],
 )
 
@@ -24,18 +22,16 @@ cc_library(
         ":dynamic_density_cc_proto",
         ":insertion_buffer",
     ],
-    copts = [
-        "-std=c++17",
-    ],
 )
 
 cc_library(
     name = "dynamic_histogram",
+    srcs = ["DynamicHistogram.cpp"],
     hdrs = ["DynamicHistogram.h"],
     deps = [
-        ":density_map_server",
         ":density_map_base",
         ":density_map_description",
+        ":density_map_server",
         ":dynamic_density_cc_proto",
         ":insertion_buffer",
     ],
@@ -60,10 +56,12 @@ cc_test(
 
 cc_library(
     name = "dynamic_kde",
+    srcs = ["DynamicKDE.cpp"],
     hdrs = ["DynamicKDE.h"],
     deps = [
         ":density_map_base",
         ":density_map_description",
+        ":density_map_server",
         ":dynamic_density_cc_proto",
         ":insertion_buffer",
     ],
@@ -88,10 +86,12 @@ cc_test(
 
 cc_library(
     name = "dynamic_kde_2d",
+    srcs = ["DynamicKDE2D.cpp"],
     hdrs = ["DynamicKDE2D.h"],
     deps = [
         ":density_map_base",
         ":density_map_description",
+        ":density_map_server",
         ":dynamic_density_cc_proto",
         ":insertion_buffer",
     ],
@@ -172,9 +172,13 @@ py_binary(
     python_version = "PY3",
 )
 
+# This requires -std=c++17 or higher.
 cc_library(
     name = "insertion_buffer",
-    srcs = ["InsertionBuffer.h"],
+    hdrs = ["InsertionBuffer.h"],
+    copts = [
+        "-std=c++17",
+    ],
 )
 
 cc_test(
@@ -192,7 +196,8 @@ cc_test(
 
 cc_library(
     name = "density_map_server",
-    srcs = ["DensityMapServer.h"],
+    srcs = ["DensityMapServer.cpp"],
+    hdrs = ["DensityMapServer.h"],
     deps = [
         ":density_map_description",
         ":dynamic_density_cc_proto",

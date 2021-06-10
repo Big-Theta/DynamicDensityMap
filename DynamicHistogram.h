@@ -30,19 +30,15 @@
 #include <map>
 #include <vector>
 
-#include "DynamicDensity.pb.h"
 #include "DensityMapBase.h"
 #include "DensityMapDescription.h"
 #include "DensityMapServer.h"
+#include "DynamicDensity.pb.h"
 #include "InsertionBuffer.h"
 
 namespace dyden {
 
 using ::dynamic_density::DensityMap;
-
-bool in_range(double val, double a, double b) {
-  return ((val <= a) ^ (val <= b)) || val == a || val == b;
-}
 
 class Bucket {
  public:
@@ -108,9 +104,7 @@ class DynamicHistogramOpts {
     register_with_server_ = register_with_server;
     return *this;
   }
-  bool register_with_server() const {
-    return register_with_server_;
-  }
+  bool register_with_server() const { return register_with_server_; }
 
  private:
   size_t num_buckets_;
@@ -123,256 +117,38 @@ class DynamicHistogramOpts {
 
 class DynamicHistogram : public DensityMapBase {
  public:
-  DynamicHistogram(const DynamicHistogramOpts& opts)
-      : DensityMapBase(DescriptionOpts()
-                           .set_type(MapType::HISTOGRAM)
-                           .set_decay_rate(opts.decay_rate())
-                           .set_refresh_interval(opts.refresh_interval())
-                           .set_title(opts.title())
-                           .set_labels({opts.label()})),
-        generation_(0),
-        refresh_generation_(0),
-        total_count_(0.0),
-        split_threshold_(0.0),
-        insertion_buffer_(/*buffer_size=*/2 * opts.refresh_interval()) {
-    ubounds_.resize(opts.num_buckets());
-    ubounds_.back() = std::numeric_limits<double>::max();
-    counts_.resize(opts.num_buckets());
-    bucket_generation_.resize(opts.num_buckets());
-    if (opts.register_with_server()) {
-      registerWithServer();
-    }
-  }
+  DynamicHistogram(const DynamicHistogramOpts& opts);
 
   virtual ~DynamicHistogram() {}
 
-  void addValue(double val) {
-    size_t unflushed = insertion_buffer_.addValue(val);
-    if (unflushed >= description().refresh_interval()) {
-      auto flush_it = insertion_buffer_.lockedIterator();
-      flush(&flush_it);
-    }
-  }
+  void addValue(double val);
 
   size_t getNumBuckets() const { return counts_.size(); }
 
-  Bucket getBucketByIndex(size_t bx) {
-    double min;
-    if (bx > 0) {
-      min = ubounds_[bx - 1];
-    } else {
-      min = getMin();
-    }
+  Bucket getBucketByIndex(size_t bx);
 
-    double max;
-    if (bx + 1 < ubounds_.size()) {
-      max = ubounds_[bx];
-    } else {
-      max = getMax();
-    }
+  double computeTotalCount();
 
-    decay(bx);
+  double getMin();
 
-    return Bucket(/*min=*/min, /*max=*/max, /*count=*/counts_[bx]);
-  }
+  double getMax();
 
-  int getBucketIndexByValue(double val) const { return -1; }
-
-  double getMin() const {
-    if (counts_[1] == 0) {
-      return ubounds_[0];
-    }
-    return ubounds_[0] -
-           (counts_[0] / counts_[1]) * (ubounds_[1] - ubounds_[0]);
-  }
-
-  double getMax() const {
-    const size_t bx = ubounds_.size() - 2;
-    if (counts_[bx] == 0.0) {
-      // The last ubounds_ value is a fake value that allows std::upper_bound
-      // to work.
-      return ubounds_[ubounds_.size() - 2];
-    }
-    return ubounds_[bx] +
-           (counts_[bx + 1] / counts_[bx]) * (ubounds_[bx] - ubounds_[bx - 1]);
-  }
-
-  double getUpperBound(int i) const {
-    if (i == -1) {
-      return getMin();
-    }
-    if (static_cast<size_t>(i) == ubounds_.size()) {
-      return getMax();
-    }
-    return ubounds_[i];
-  }
-
-  double computeTotalCount() {
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
-    return total_count_;
-  }
-
-  double getMean() {
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
-
-    double mean = 0.0;
-    mean += counts_[0] * (getMin() + ubounds_[0]) / 2 / total_count_;
-
-    size_t i = 1;
-    for (; i < counts_.size() - 1; i++) {
-      const double new_val = (ubounds_[i - 1] + ubounds_[i]) / 2;
-      mean += counts_[i] * new_val / total_count_;
-    }
-
-    mean += counts_[i] * (ubounds_[i - 1] + getMax()) / 2 / total_count_;
-    return mean;
-  }
+  double getMean();
 
   // quantile is in [0, 1]
-  double getQuantileEstimate(double quantile) {
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
+  double getQuantileEstimate(double quantile);
 
-    if (total_count_ == 0.0) {
-      return 0.0;
-    }
+  double getQuantileOfValue(double value);
 
-    double cdf = 0.0;
-    double next_cdf = 0.0;
-    size_t bx = 0;
-    for (size_t i = 0; i < counts_.size(); i++) {
-      next_cdf = cdf + counts_[i] / total_count_;
-      if (next_cdf > quantile) {
-        bx = i;
-        break;
-      }
-      cdf = next_cdf;
-    }
+  std::string debugString();
 
-    double frac = (quantile - cdf) / (next_cdf - cdf);
+  std::string json();
 
-    double lower_bound;
-    if (bx == 0) {
-      lower_bound = getMin();
-    } else {
-      lower_bound = ubounds_[bx - 1];
-    }
+  DensityMap asProto() override;
 
-    double upper_bound;
-    if (bx + 1 < ubounds_.size()) {
-      upper_bound = ubounds_[bx];
-    } else {
-      upper_bound = getMax();
-    }
+  void toProto(DensityMap* proto) override;
 
-    return frac * (upper_bound - lower_bound) + lower_bound;
-  }
-
-  double getQuantileOfValue(double value) {
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
-
-    if (value <= getMin()) {
-      return getMin();
-    }
-
-    if (value >= getMax()) {
-      return getMax();
-    }
-
-    double count = 0.0;
-    for (size_t i = 0; i < counts_.size(); i++) {
-      if (ubounds_[i] >= value) {
-        count += counts_[i];
-      } else {
-        count += (getUpperBound(i) - value) /
-                 (getUpperBound(i) - getUpperBound(static_cast<int>(i) - 1));
-        break;
-      }
-    }
-
-    return count / computeTotalCount();
-  }
-
-  std::string debugString() {
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
-
-    std::string s;
-    s += "generation: " + std::to_string(total_count_) +
-         "\n"
-         "total_count: " +
-         std::to_string(total_count_) + "\n";
-    s += "  " + std::to_string(0) + " [" + std::to_string(getMin()) + ", " +
-         std::to_string(ubounds_[0]) + "): " + std::to_string(counts_[0]) +
-         "\n";
-    size_t i = 1;
-    for (; i < counts_.size() - 1; i++) {
-      s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
-           ", " + std::to_string(ubounds_[i]) +
-           "): " + std::to_string(counts_[i]) + "\n";
-    }
-    s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
-         ", " + std::to_string(getMax()) + "): " + std::to_string(counts_[i]);
-    return s;
-  }
-
-  std::string json() {
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
-
-    std::string s("{\n");
-    if (!description().title().empty()) {
-      s += "  \"title\": \"" + description().title() + "\",\n";
-    }
-    if (!description().labels().empty()) {
-      s += "  \"label\": \"" + description().labels()[0] + "\",\n";
-    }
-    s += "  \"bounds\": [" + std::to_string(getMin()) + ", ";
-    for (size_t i = 0; i + 1 < ubounds_.size(); i++) {
-      s += std::to_string(ubounds_[i]) + ", ";
-    }
-    s += std::to_string(getMax()) + "],\n  \"counts\": [";
-
-    size_t i = 0;
-    for (; i < counts_.size() - 1; i++) {
-      s += std::to_string(counts_[i]) + ", ";
-    }
-    s += std::to_string(counts_[i]) + "]\n}";
-    return s;
-  }
-
-  DensityMap asProto() override {
-    DensityMap dm;
-    toProto(&dm);
-    return dm;
-  }
-
-  void toProto(DensityMap* proto) override {
-    auto* dhist = proto->mutable_dynamic_histogram();
-
-    auto* desc = dhist->mutable_description();
-    description().toProto(desc);
-
-    auto flush_it = insertion_buffer_.lockedIterator();
-    flush(&flush_it);
-
-    dhist->add_bounds(getMin());
-    for (size_t i = 0; i + 1 < ubounds_.size(); i++) {
-      dhist->add_bounds(ubounds_[i]);
-    }
-    dhist->add_bounds(getMax());
-
-    for (size_t i = 0; i < counts_.size(); i++) {
-      dhist->add_counts(counts_[i]);
-    }
-  }
-
-  void registerWithServer() override {
-    DensityMapRegistry::getInstance().registerDensityMap(this);
-  }
+  void registerWithServer() override;
 
  protected:
   uint64_t generation_;
@@ -388,230 +164,33 @@ class DynamicHistogram : public DensityMapBase {
   std::vector<double> ubounds_;
   std::vector<double> counts_;
   std::vector<uint64_t> bucket_generation_;
-  std::vector<double> quantiles_;
-  std::vector<double> quantile_locations_;
 
-  double splitThreshold() const { return split_threshold_; }
+  double splitThreshold() const;
 
-  double decay_rate() const { return description().decay_rate(); }
+  double decay_rate() const;
 
-  void flush(FlushIterator<double>* flush_it) {
-    for (; *flush_it; ++(*flush_it)) {
-      flushValue(**flush_it);
-    }
-    refresh();
-  }
+  double getMinRaw() const;
 
-  void flushValue(double val) {
-    generation_++;
+  double getMaxRaw() const;
 
-    // shift_quantiles will treat the new value as a point with mass 1 which
-    // only makes sense after the decay and before the point has been
-    // integrated into the histogram.
-    // shift_quantiles(val);
-    size_t bx = insertValue(val);
+  double getUpperBound(int i) const;
 
-    if (decay_rate() != 0.0) {
-      total_count_ = total_count_ * (1.0 - decay_rate()) + 1.0;
-    } else {
-      total_count_ = generation_;
-    }
+  void flush(FlushIterator<double>* flush_it);
 
-    if (counts_[bx] < splitThreshold()) {
-      return;
-    }
+  void flushValue(double val);
 
-    refresh();
+  void decay(size_t bx);
 
-    split(bx);
-    merge();
-  }
-
-  void decay(size_t bx) {
-    uint64_t old_generation = bucket_generation_[bx];
-    bucket_generation_[bx] = generation_;
-    if (decay_rate() == 0.0) {
-      return;
-    }
-    counts_[bx] *= description().decay_factor(generation_ - old_generation);
-    bucket_generation_[bx] = generation_;
-  }
-
-  void refresh() {
-    if (refresh_generation_ == generation_) {
-      return;
-    }
-
-    total_count_ = 0.0;
-    double min_count = std::numeric_limits<double>::max();
-    double max_count = 0.0;
-    for (size_t bx = 0; bx < counts_.size(); bx++) {
-      decay(bx);
-      double count = counts_[bx];
-      total_count_ += count;
-      if (count < min_count) {
-        min_count = count;
-      }
-      if (count > max_count) {
-        max_count = count;
-      }
-    }
-    refresh_generation_ = generation_;
-    if (min_count * 4 < max_count) {
-      split_threshold_ = max_count;
-    } else {
-      split_threshold_ = 2 * total_count_ / getNumBuckets();
-    }
-  }
+  void refresh();
 
   // Adjust bounds and add.
   // Returns:
   //   The index of the bucket that the new value landed in.
-  size_t insertValue(double val) {
-    size_t bx =
-        std::distance(ubounds_.begin(),
-                      std::upper_bound(ubounds_.begin(), ubounds_.end(), val));
+  size_t insertValue(double val);
 
-    decay(bx);
+  void split(size_t bx);
 
-    double count_bx = counts_[bx];
-    if (bx > 0) {
-      decay(bx - 1);
-      double count_with_below = counts_[bx - 1] + count_bx;
-      // Roundoff issues can happen, so make sure that the bound does *not* move
-      // left.
-      ubounds_[bx - 1] = std::max((count_with_below * ubounds_[bx - 1] + val) /
-                                      (count_with_below + 1.0),
-                                  ubounds_[bx - 1]);
-    }
-
-    if (bx + 1 < counts_.size()) {
-      decay(bx + 1);
-      double count_with_above = count_bx + counts_[bx + 1];
-      // Roundoff issues can happen, so make sure that the bound does *not* move
-      // right.
-      ubounds_[bx] = std::min(
-          (count_with_above * ubounds_[bx] + val) / (count_with_above + 1.0),
-          ubounds_[bx]);
-    }
-
-    counts_[bx] = count_bx + 1;
-
-    return bx;
-  }
-
-  void split(size_t bx) {
-    double lower_bound;
-    if (bx == 0) {
-      lower_bound = getMin();
-    } else {
-      lower_bound = ubounds_[bx - 1];
-    }
-
-    if (bx + 1 == ubounds_.size()) {
-      double upper_bound = getMax();
-      ubounds_.back() = (lower_bound + upper_bound) / 2.0;
-      ubounds_.push_back(std::numeric_limits<double>::max());
-      counts_[bx] /= 2.0;
-      counts_.push_back(counts_.back());
-    } else {
-      double upper_bound = ubounds_[bx];
-
-      ubounds_.push_back(0.0);
-      for (size_t i = ubounds_.size() - 1; i > bx; i--) {
-        ubounds_[i] = ubounds_[i - 1];
-      }
-
-      ubounds_[bx] = (lower_bound + upper_bound) / 2.0;
-
-      counts_.push_back(0.0);
-      for (size_t i = counts_.size() - 1; i > bx; i--) {
-        counts_[i] = counts_[i - 1];
-      }
-      counts_[bx] /= 2.0;
-      counts_[bx + 1] = counts_[bx];
-    }
-  }
-
-  void merge() {
-    int merge_idx = 0;
-    double merged_count = counts_[0] + counts_[1];
-    for (size_t i = 1; i < counts_.size() - 1; i++) {
-      double pos_count = counts_[i] + counts_[i + 1];
-      if (pos_count < merged_count) {
-        merge_idx = i;
-        merged_count = pos_count;
-      }
-    }
-
-    for (size_t i = merge_idx; i < ubounds_.size() - 1; i++) {
-      ubounds_[i] = ubounds_[i + 1];
-    }
-    ubounds_.pop_back();
-
-    counts_[merge_idx] = merged_count;
-    for (size_t i = merge_idx + 1; i < counts_.size() - 1; i++) {
-      counts_[i] = counts_[i + 1];
-    }
-    counts_.pop_back();
-  }
-
-  void shift_quantiles(double val) {
-    for (size_t idx = 0; idx < quantiles_.size(); idx++) {
-      double shift_remaining = quantiles_[idx];
-      double location = quantile_locations_[idx];
-      if (val < location) {
-        shift_remaining = -shift_remaining;
-      }
-
-      size_t bx = getBucketIndexByValue(location);
-      Bucket bucket = getBucketByIndex(bx);
-      do {
-        double target_location = val;
-        if (bucket.count() != 0.0) {
-          target_location = quantiles_[idx] + shift_remaining *
-                                                  bucket.diameter() /
-                                                  bucket.count();
-        }
-
-        if (in_range(val, bucket.min(), bucket.max()) &&
-            in_range(val, location, target_location)) {
-          // The inserted value is in between the current location and the
-          // target location, which is in this bucket. Since the inserted value
-          // has a point mass of 1, that's the farthest we can shift the value.
-          quantile_locations_[idx] = val;
-          break;
-        }
-
-        if (bx > 0 && in_range(bucket.min(), location, target_location)) {
-          // Shift to the lower bucket.
-          shift_remaining = shift_remaining * (location - bucket.min()) /
-                            (location - target_location);
-          location = bucket.min();
-          --bx;
-          bucket = getBucketByIndex(bx);
-        } else if (bx + 1 < ubounds_.size() &&
-                   in_range(bucket.max(), location, target_location)) {
-          // Shift to the upper bucket.
-          shift_remaining = shift_remaining * (bucket.max() - location) /
-                            (target_location - location);
-          location = bucket.max();
-          ++bx;
-          bucket = getBucketByIndex(bx);
-        } else {
-          quantile_locations_[idx] = target_location;
-          shift_remaining = 0.0;
-        }
-      } while (shift_remaining);
-    }
-  }
-
-  // Shifts the quantile inside the bucket. Returns the amount that remains to
-  // be shifted. If 0, the shift is done.
-  double shift_quantile_in_bucket(int quantile_idx, double val,
-                                  double shift_remaining) {
-    return 0.0;
-  }
+  void merge();
 };
 
 }  // namespace dyden

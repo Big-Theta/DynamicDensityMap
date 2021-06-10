@@ -2,7 +2,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace dhist {
+namespace dyden {
 
 TEST(InsertionBufferTest, ctor) {
   InsertionBuffer<int> a;

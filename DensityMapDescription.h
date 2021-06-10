@@ -40,9 +40,7 @@ class Identifier {
  protected:
   friend class Description;
 
-  void set_identity(int32_t identity) {
-    identity_ = identity;
-  }
+  void set_identity(int32_t identity) { identity_ = identity; }
 
  private:
   int32_t identity_;
@@ -111,85 +109,24 @@ class Description {
 
   const Identifier& identifier() const { return identifier_; }
 
-  void setFromProto(const DensityMapDescription& proto) {
-    title_ = proto.title();
-
-    labels_.clear();
-    for (auto label : proto.labels()) {
-      labels_.push_back(label);
-    }
-
-    decay_rate_ = proto.decay_rate();
-  }
+  void setFromProto(const DensityMapDescription& proto);
 
   const std::string& title() const { return title_; }
   void set_title(std::string title) { title_ = title; }
 
   const std::vector<std::string> labels() const { return labels_; }
-  void set_labels(std::vector<std::string> labels) {
-    labels_ = labels;
-  }
+  void set_labels(std::vector<std::string> labels) { labels_ = labels; }
 
   double decay_rate() const { return decay_rate_; }
-  void set_decay_rate(double rate) {
-    // Keep this in line with the size of the InsertionBuffer.
-    decay_factors_.resize(2 * refresh_interval());
-    double decay = 1.0;
-    for (size_t i = 0; i < refresh_interval(); i++) {
-      decay_factors_[i] = decay;
-      decay *= 1.0 - rate;
-    }
-    decay_rate_ = rate;
-  }
+  void set_decay_rate(double rate);
 
   size_t refresh_interval() const { return refresh_interval_; }
 
-  DensityMapDescription asProto() const {
-    DensityMapDescription desc;
-    toProto(&desc);
-    return desc;
-  }
-
-  void toProto(DensityMapDescription* proto) const {
-    DensityMapIdentifier* identifier = proto->mutable_identifier();
-    identifier->set_identity(identifier_.identity());
-
-    proto->set_title(title_);
-
-    for (const auto& label : labels_) {
-      proto->add_labels(label);
-    }
-
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    proto->mutable_timestamp()->set_seconds(tv.tv_sec);
-    proto->mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
-
-    proto->set_decay_rate(decay_rate());
-
-    if (type_ == MapType::HISTOGRAM) {
-      proto->set_type(DensityMapDescription::HISTOGRAM);
-    } else if (type_ == MapType::KDE) {
-      proto->set_type(DensityMapDescription::KDE);
-    } else {
-      proto->set_type(DensityMapDescription::KDE2D);
-    }
-  }
+  DensityMapDescription asProto() const;
+  void toProto(DensityMapDescription* proto) const;
 
   static void copyToProto(const DensityMapDescription& from_proto,
-                          DensityMapDescription* to_proto) {
-    DensityMapIdentifier* identifier = to_proto->mutable_identifier();
-    identifier->set_identity(from_proto.identifier().identity());
-    to_proto->set_title(from_proto.title());
-    for (const auto& label : from_proto.labels()) {
-      to_proto->add_labels(label);
-    }
-    to_proto->mutable_timestamp()->set_seconds(
-        from_proto.timestamp().seconds());
-    to_proto->mutable_timestamp()->set_nanos(from_proto.timestamp().nanos());
-    to_proto->set_decay_rate(from_proto.decay_rate());
-    to_proto->set_type(from_proto.type());
-  }
+                          DensityMapDescription* to_proto);
 
  protected:
   friend class DensityMapBase;
@@ -216,9 +153,6 @@ class Description {
   MapType type_;
 
   std::vector<double> decay_factors_;
-
-  void initDecayFactors() {
-  }
 };
 
 }  // namespace dyden
