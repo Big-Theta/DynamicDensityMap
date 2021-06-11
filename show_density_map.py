@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
+from collections import deque
 from matplotlib import animation
 from matplotlib import pyplot
 from scipy.stats import norm, multivariate_normal
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import argparse
 import bisect
@@ -39,6 +40,10 @@ parser.add_argument(
         help="The number of points to use for the display. "
              "A small number will reduce the processing time needed to produce "
              "graphs but will also reduce resolution.")
+parser.add_argument(
+        "--shadow_frames", type=int, default=0,
+        help="If greater than 0, adds shadow graphs for animations of "
+             "DynamicHistogram and DynamicKDE. This can reduce jitter.")
 args = parser.parse_args()
 
 
@@ -74,18 +79,11 @@ def prepare_render_hist(
         f[i] = this_cdf - last_cdf
         last_cdf = this_cdf
 
-    pyplot.clf()
-
-    title = proto.description.title
-    if len(proto.description.labels):
-        pyplot.xlabel(proto.description.labels[0])
-
-    pyplot.title(title)
-    pyplot.fill_between(x_d, f, alpha=alpha)
+    return x_d, f
 
 
 def prepare_render_dkde(proto: DynamicDensity_pb2.DynamicKDE,
-                        alpha: float = 1.0):
+                        alpha: float = 1.0) -> Tuple[List[float], List[float]]:
     total = sum([kernel.count for kernel in proto.kernels])
     x_min = proto.kernels[0].coord[0] - 6 * proto.kernels[0].variance[0]
     x_max = proto.kernels[-1].coord[0] + 6 * proto.kernels[-1].variance[0]
@@ -104,18 +102,10 @@ def prepare_render_dkde(proto: DynamicDensity_pb2.DynamicKDE,
             f[i] += (cdf - last_cdf) * weight
             last_cdf = cdf
 
-    pyplot.clf()
-
-    title = proto.description.title
-    if len(proto.description.labels):
-        pyplot.xlabel(proto.description.labels[0])
-
-    pyplot.title(title)
-    pyplot.fill_between(x_d, f, alpha=alpha)
+    return x_d, f
 
 
-def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
-                           alpha: float = 1.0):
+def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE):
     total = sum([kernel.count for kernel in proto.kernels])
 
     range_x = [proto.kernels[0].coord[0], proto.kernels[0].coord[0]]
@@ -186,11 +176,24 @@ def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
                     weight *
                     volumn_at_coord(dist, xval, yval, diameter_x, diameter_y))
 
-    pyplot.clf()
-    ax = pyplot.axes(projection='3d')
-    pyplot.title(proto.description.title, fontsize=24)
+    return xx, yy, f
 
-    proto_labels = proto.description.labels
+
+def render_1d(description, x_d, f, alpha=1.0):
+    if description is not None:
+        title = description.title
+        if len(description.labels):
+            pyplot.xlabel(description.labels[0])
+        pyplot.title(title)
+
+    pyplot.fill_between(x_d, f, color="#1f77b4", alpha=alpha)
+
+
+def render_2d(description: DynamicDensity_pb2.DensityMapDescription, xx, yy, f):
+    ax = pyplot.axes(projection='3d')
+    pyplot.title(description.title, fontsize=24)
+
+    proto_labels = description.labels
     if len(proto_labels) >= 1:
         ax.set_xlabel(proto_labels[0], fontsize=18)
     if len(proto_labels) >= 2:
@@ -217,6 +220,9 @@ def gen_from_server():
 
     hist_type = None
 
+    shadow_x_d = deque(maxlen=args.shadow_frames)
+    shadow_f = deque(maxlen=args.shadow_frames)
+
     with grpc.insecure_channel(args.server) as channel:
         while True:
             response = channel.unary_unary(
@@ -235,12 +241,31 @@ def gen_from_server():
                 else:
                     hist_type = "dynamic_kde_2d"
 
-            if hist_type == "dynamic_histogram":
-                prepare_render_hist(ddens.dynamic_histogram)
-            elif hist_type == "dynamic_kde":
-                prepare_render_dkde(ddens.dynamic_kde)
+            if hist_type == "dynamic_kde_2d":
+                xx, yy, f = prepare_render_dkde_2d(ddens.dynamic_kde)
+                pyplot.clf()
+                render_2d(ddens.dynamic_kde.description, xx, yy, f)
             else:
-                prepare_render_dkde_2d(ddens.dynamic_kde)
+                if hist_type == "dynamic_histogram":
+                    x_d, f = prepare_render_hist(ddens.dynamic_histogram)
+                    description = ddens.dynamic_histogram.description
+                else:
+                    x_d, f = prepare_render_dkde(ddens.dynamic_kde)
+                    description = ddens.dynamic_kde.description
+
+                pyplot.clf()
+
+                alpha = 1.0 / (1 + 2 * args.shadow_frames)
+                alpha_delta = alpha
+
+                for i in range(len(shadow_x_d)):
+                    render_1d(None, shadow_x_d[i], shadow_f[i], alpha)
+                    alpha += alpha_delta
+
+                render_1d(description, x_d, f, alpha=1.0)
+
+                shadow_x_d.append(x_d)
+                shadow_f.append(f)
 
             yield
 
@@ -285,14 +310,22 @@ def interact_with_server():
     if args.print:
         print(ddens)
 
-    if ddens.HasField("dynamic_histogram"):
-        prepare_render_hist(ddens.dynamic_histogram)
-    elif len(ddens.dynamic_kde.kernels[0].coord) == 1:
-        prepare_render_dkde(ddens.dynamic_kde)
-    elif len(ddens.dynamic_kde.kernels[0].coord) == 2:
-        prepare_render_dkde_2d(ddens.dynamic_kde)
+    if (ddens.HasField("dynamic_kde")
+        and len(ddens.dynamic_kde.kernels[0].coord) == 2
+    ):
+        xx, yy, f = prepare_render_dkde_2d(ddens.dynamic_kde)
+        pyplot.clf()
+        render_2d(ddens.dynamic_kde.description, xx, yy, f)
     else:
-        assert(False)
+        if ddens.HasField("dynamic_histogram"):
+            x_d, f = prepare_render_hist(ddens.dynamic_histogram)
+            description = ddens.dynamic_histogram.description
+        else:
+            x_d, f = prepare_render_kde(ddens.dynamic_kde)
+            description = ddens.dynamic_kde.description
+
+        pyplot.clf()
+        render_1d(description, x_d, f)
 
     pyplot.show()
 
@@ -318,13 +351,19 @@ if __name__ == "__main__":
         ddens = DynamicDensity_pb2.DensityMap()
         ddens.ParseFromString(serialized)
 
-        if ddens.HasField("dynamic_histogram"):
-            prepare_render_hist(ddens.dynamic_histogram)
+        if ddens.HasField("dynamic_kde_2d"):
+            xx, yy, f = prepare_render_dkde_2d(ddens.dynamic_kde)
+            pyplot.clf()
+            render_2d(ddens.dynamic_kde.description, xx, yy, f)
         else:
-            if ddens.dynamic_kde.kernels[0].HasField("covariance"):
-                prepare_render_dkde_2d(ddens.dynamic_kde)
+            if ddens.HasField("dynamic_histogram"):
+                x_d, f = prepare_render_hist(ddens.dynamic_histogram)
+                description = ddens.dynamic_histogram.description
             else:
-                prepare_render_dkde(ddens.dynamic_kde)
+                x_d, f = prepare_render_kde(ddens.dynamic_kde)
+                description = ddens.dynamic_kde.description
+            pyplot.clf()
+            render_1d(description, x_d, f)
 
         pyplot.show()
     elif args.server:

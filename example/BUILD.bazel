@@ -1,8 +1,8 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 cc_binary(
-    name = "run_malloc",
-    srcs = ["run_malloc.cpp"],
+    name = "profile_malloc",
+    srcs = ["profile_malloc.cpp"],
     deps = [
         "@dynamic_density_map//:density_map_server",
         "@dynamic_density_map//:dynamic_histogram",
