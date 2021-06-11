@@ -30,7 +30,7 @@
 #include "DynamicKDE.h"
 #include "DynamicKDE2D.h"
 
-uint64_t rdtsc(){
+uint64_t rdtsc() {
   unsigned int lo, hi;
   __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
   return ((uint64_t)hi << 32) | lo;
@@ -52,24 +52,24 @@ int main() {
 
   dyden::DynamicHistogram dynamic_histogram(
       dyden::DynamicHistogramOpts()
-          .set_num_buckets(100)
-          .set_decay_rate(0.00001)
-          .set_title("malloc")
-          .set_label("log(cycles)")
-          .set_register_with_server(true));
+          .setNumBuckets(100)
+          .setDecayRate(0.00001)
+          .setTitle("malloc")
+          .setLabel("log(cycles)")
+          .setRegisterWithServer(true));
   dyden::DynamicKDE dynamic_kde(dyden::DynamicKDEOpts()
-                                    .set_num_kernels(100)
-                                    .set_decay_rate(0.00001)
-                                    .set_title("malloc")
-                                    .set_label("log(cycles)")
-                                    .set_register_with_server(true));
+                                    .setNumKernels(100)
+                                    .setDecayRate(0.00001)
+                                    .setTitle("malloc")
+                                    .setLabel("log(cycles)")
+                                    .setRegisterWithServer(true));
   dyden::DynamicKDE2D dynamic_kde_2d(
       dyden::DynamicKDE2DOpts()
-          .set_num_kernels(100)
-          .set_decay_rate(0.00001)
-          .set_title("malloc")
-          .set_labels({"log(cycles)", "log(size)"})
-          .set_register_with_server(true));
+          .setNumKernels(75)
+          .setDecayRate(0.00001)
+          .setTitle("malloc")
+          .setLabels({"log(cycles)", "log(size)"})
+          .setRegisterWithServer(true));
 
   for (int tx = 0; tx < kNumThreads; tx++) {
     threads[tx] = std::thread(
@@ -110,4 +110,3 @@ int main() {
     threads[tx].join();
   }
 }
-

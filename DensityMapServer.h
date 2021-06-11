@@ -30,9 +30,9 @@
 #include <thread>
 #include <vector>
 
+#include "DensityMapBase.h"
 #include "DynamicDensity.grpc.pb.h"
 #include "DynamicDensity.pb.h"
-#include "DensityMapBase.h"
 
 namespace dyden {
 
@@ -53,7 +53,7 @@ class DensityMapRegistry {
   void registerDensityMap(DensityMapBase* density_map);
 
   void ListDensityMaps(const ::dynamic_density::ListDensityMapsParams& request,
-                      ::dynamic_density::ListDensityMapsResult* reply);
+                       ::dynamic_density::ListDensityMapsResult* reply);
 
   Status GetDensityMap(const DensityMapIdentifier& request, DensityMap* reply);
 

@@ -63,13 +63,13 @@ class Kernel2D {
 
   void decay(double factor, uint64_t new_generation);
 
-  double mean_x() const;
+  double meanX() const;
 
-  double mean_y() const;
+  double meanY() const;
 
-  double variance_xx() const;
+  double varianceXX() const;
 
-  double variance_yy() const;
+  double varianceYY() const;
 
   double covariance() const;
 
@@ -102,41 +102,41 @@ class DynamicKDE2DOpts {
         labels_({"x-label", "y-label"}),
         register_with_server_(false) {}
 
-  DynamicKDE2DOpts& set_num_kernels(size_t num_kernels) {
+  DynamicKDE2DOpts& setNumKernels(size_t num_kernels) {
     num_kernels_ = num_kernels;
     return *this;
   }
-  size_t num_kernels() const { return num_kernels_; }
+  size_t numKernels() const { return num_kernels_; }
 
-  DynamicKDE2DOpts& set_decay_rate(double decay_rate) {
+  DynamicKDE2DOpts& setDecayRate(double decay_rate) {
     decay_rate_ = decay_rate;
     return *this;
   }
-  double decay_rate() const { return decay_rate_; }
+  double decayRate() const { return decay_rate_; }
 
-  DynamicKDE2DOpts& set_refresh_interval(size_t refresh_interval) {
+  DynamicKDE2DOpts& setRefreshInterval(size_t refresh_interval) {
     refresh_interval_ = refresh_interval;
     return *this;
   }
-  size_t refresh_interval() const { return refresh_interval_; }
+  size_t refreshInterval() const { return refresh_interval_; }
 
-  DynamicKDE2DOpts& set_title(std::string title) {
+  DynamicKDE2DOpts& setTitle(std::string title) {
     title_ = title;
     return *this;
   }
   std::string title() const { return title_; }
 
-  DynamicKDE2DOpts& set_labels(std::vector<std::string> labels) {
+  DynamicKDE2DOpts& setLabels(std::vector<std::string> labels) {
     labels_ = labels;
     return *this;
   }
   std::vector<std::string> labels() const { return labels_; }
 
-  DynamicKDE2DOpts& set_register_with_server(bool register_with_server) {
+  DynamicKDE2DOpts& setRegisterWithServer(bool register_with_server) {
     register_with_server_ = register_with_server;
     return *this;
   }
-  bool register_with_server() const { return register_with_server_; }
+  bool registerWithServer() const { return register_with_server_; }
 
  private:
   size_t num_kernels_;
@@ -176,7 +176,7 @@ class DynamicKDE2D : public DensityMapBase {
 
   double splitThreshold() const;
 
-  double decay_rate() const;
+  double decayRate() const;
 
   void flush(FlushIterator<std::pair<double, double>>* flush_it);
 

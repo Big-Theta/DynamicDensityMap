@@ -36,10 +36,10 @@ TEST(KernelTest, addValue) {
   k.addValue(5.0, 50.0, 1.0);
   k.addValue(7.0, 70.0, 1.0);
 
-  EXPECT_EQ(k.mean_x(), 4.0);
-  EXPECT_EQ(k.mean_y(), 40.0);
-  EXPECT_EQ(k.variance_xx(), 5.0);
-  EXPECT_EQ(k.variance_yy(), 500.0);
+  EXPECT_EQ(k.meanX(), 4.0);
+  EXPECT_EQ(k.meanY(), 40.0);
+  EXPECT_EQ(k.varianceXX(), 5.0);
+  EXPECT_EQ(k.varianceYY(), 500.0);
   EXPECT_EQ(k.covariance(), 50.0);
   EXPECT_EQ(k.count(), 4.0);
 }
@@ -52,10 +52,10 @@ TEST(KernelTest, decay) {
   k.addValue(7.0, 70.0, 1.0);
   k.decay(0.9, 5);
 
-  EXPECT_EQ(k.mean_x(), 4.0);
-  EXPECT_EQ(k.mean_y(), 40.0);
-  EXPECT_EQ(k.variance_xx(), 5.0);
-  EXPECT_EQ(k.variance_yy(), 500.0);
+  EXPECT_EQ(k.meanX(), 4.0);
+  EXPECT_EQ(k.meanY(), 40.0);
+  EXPECT_EQ(k.varianceXX(), 5.0);
+  EXPECT_EQ(k.varianceYY(), 500.0);
   EXPECT_EQ(k.covariance(), 50.0);
   EXPECT_EQ(k.count(), 3.6);
 }
@@ -67,10 +67,10 @@ TEST(KernelTest, weightedAddValue) {
   k.addValue(5.0, 50.0, 0.5);
   k.addValue(7.0, 70.0, 0.5);
 
-  EXPECT_EQ(k.mean_x(), 4.0);
-  EXPECT_EQ(k.mean_y(), 40.0);
-  EXPECT_EQ(k.variance_xx(), 5.0);
-  EXPECT_EQ(k.variance_yy(), 500.0);
+  EXPECT_EQ(k.meanX(), 4.0);
+  EXPECT_EQ(k.meanY(), 40.0);
+  EXPECT_EQ(k.varianceXX(), 5.0);
+  EXPECT_EQ(k.varianceYY(), 500.0);
   EXPECT_EQ(k.covariance(), 50.0);
   EXPECT_EQ(k.count(), 2.0);
 }
@@ -96,7 +96,7 @@ TEST(DynamicKDE2DTest, addNoDecay) {
   static constexpr int kNumValues = 10000;
   static constexpr double kDecayRate = 0.0;
   DynamicKDE2D uut(
-      DynamicKDE2DOpts().set_num_kernels(200).set_decay_rate(kDecayRate));
+      DynamicKDE2DOpts().setNumKernels(200).setDecayRate(kDecayRate));
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
   std::uniform_real_distribution unif(0.0, 1.0);

@@ -140,27 +140,27 @@ void Kernel::populateProto(::dynamic_density::DynamicKDE_Kernel* proto) const {
 
 DynamicKDE::DynamicKDE(const DynamicKDEOpts& opts)
     : DensityMapBase(DescriptionOpts()
-                         .set_type(MapType::KDE)
-                         .set_decay_rate(opts.decay_rate())
-                         .set_refresh_interval(opts.refresh_interval())
-                         .set_title(opts.title())
-                         .set_labels({opts.label()})
-                         .set_num_containers(opts.num_kernels())),
+                         .setType(MapType::KDE)
+                         .setDecayRate(opts.decayRate())
+                         .setRefreshInterval(opts.refreshInterval())
+                         .setTitle(opts.title())
+                         .setLabels({opts.label()})
+                         .setNumContainers(opts.numKernels())),
       generation_(0),
       refresh_generation_(0),
       total_count_(0.0),
       split_threshold_(0.0),
-      insertion_buffer_(/*buffer_size=*/2 * opts.refresh_interval()) {
-  kernels_.reserve(opts.num_kernels() + 2);
-  kernels_.resize(opts.num_kernels());
-  if (opts.register_with_server()) {
+      insertion_buffer_(/*buffer_size=*/2 * opts.refreshInterval()) {
+  kernels_.reserve(opts.numKernels() + 2);
+  kernels_.resize(opts.numKernels());
+  if (opts.registerWithServer()) {
     registerWithServer();
   }
 }
 
 void DynamicKDE::addValue(double val) {
   size_t unflushed = insertion_buffer_.addValue(val);
-  if (unflushed >= description().refresh_interval()) {
+  if (unflushed >= description().refreshInterval()) {
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
   }
@@ -271,7 +271,7 @@ void DynamicKDE::registerWithServer() {
 
 double DynamicKDE::splitThreshold() const { return split_threshold_; }
 
-double DynamicKDE::decay_rate() const { return description().decay_rate(); }
+double DynamicKDE::decayRate() const { return description().decayRate(); }
 
 void DynamicKDE::flush(FlushIterator<double>* flush_it) {
   for (; *flush_it; ++(*flush_it)) {
@@ -288,7 +288,7 @@ void DynamicKDE::flushValue(double val) {
   int num_splits = 0;
   if (kx == 0) {
     kernels_[kx].decay(
-        description().decay_factor(generation_ - kernels_[kx].generation()),
+        description().decayFactor(generation_ - kernels_[kx].generation()),
         generation_);
     kernels_[kx].addValue(val, 1.0);
     if (kernels_[kx].count() > splitThreshold()) {
@@ -297,7 +297,7 @@ void DynamicKDE::flushValue(double val) {
     }
   } else if (kx == getNumKernels()) {
     kernels_[kx - 1].decay(
-        description().decay_factor(generation_ - kernels_[kx - 1].generation()),
+        description().decayFactor(generation_ - kernels_[kx - 1].generation()),
         generation_);
     kernels_[kx - 1].addValue(val, 1.0);
     if (kernels_[kx - 1].count() > splitThreshold()) {
@@ -315,7 +315,7 @@ void DynamicKDE::flushValue(double val) {
     }
 
     kernels_[kx].decay(
-        description().decay_factor(generation_ - kernels_[kx].generation()),
+        description().decayFactor(generation_ - kernels_[kx].generation()),
         generation_);
     kernels_[kx].addValue(val, 1.0 - count_left);
     if (kernels_[kx].count() > splitThreshold()) {
@@ -324,7 +324,7 @@ void DynamicKDE::flushValue(double val) {
     }
 
     kernels_[kx - 1].decay(
-        description().decay_factor(generation_ - kernels_[kx - 1].generation()),
+        description().decayFactor(generation_ - kernels_[kx - 1].generation()),
         generation_);
     kernels_[kx - 1].addValue(val, count_left);
     if (kernels_[kx - 1].count() > splitThreshold()) {
@@ -337,8 +337,8 @@ void DynamicKDE::flushValue(double val) {
     merge();
   }
 
-  if (decay_rate() != 0.0) {
-    total_count_ = total_count_ * (1.0 - decay_rate()) + 1.0;
+  if (decayRate() != 0.0) {
+    total_count_ = total_count_ * (1.0 - decayRate()) + 1.0;
   } else {
     total_count_ = generation_;
   }
@@ -371,9 +371,9 @@ void DynamicKDE::refresh() {
     split_threshold_ = 2 * total_count_ / getNumKernels();
   }
 
-  if (static_cast<int32_t>(getNumKernels()) != description().num_containers()) {
+  if (static_cast<int32_t>(getNumKernels()) != description().numContainers()) {
     while (static_cast<int32_t>(getNumKernels()) <
-           description().num_containers()) {
+           description().numContainers()) {
       size_t kx = 0;
       double highest_count = kernels_[0].count();
       for (size_t i = 1; i < kernels_.size(); i++) {
@@ -386,7 +386,7 @@ void DynamicKDE::refresh() {
     }
 
     while (static_cast<int32_t>(getNumKernels()) >
-           description().num_containers()) {
+           description().numContainers()) {
       merge();
     }
 
@@ -397,7 +397,7 @@ void DynamicKDE::refresh() {
 void DynamicKDE::decayAll() {
   for (size_t kx = 0; kx < kernels_.size(); kx++) {
     kernels_[kx].decay(
-        description().decay_factor(generation_ - kernels_[kx].generation()),
+        description().decayFactor(generation_ - kernels_[kx].generation()),
         generation_);
   }
 }

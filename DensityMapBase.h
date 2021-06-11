@@ -41,7 +41,7 @@ class DensityMapBase {
 
   const Description& description() const { return description_; }
 
-  Description* mutable_description() { return &description_; }
+  Description* mutableDescription() { return &description_; }
 
  private:
   Description description_;

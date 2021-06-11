@@ -32,7 +32,7 @@ TEST(DynamicHistogramTest, addNoDecay) {
   static constexpr int kNumValues = 1000;
   static constexpr double kDecayRate = 0.0;
   DynamicHistogram uut(
-      DynamicHistogramOpts().set_num_buckets(31).set_decay_rate(kDecayRate));
+      DynamicHistogramOpts().setNumBuckets(31).setDecayRate(kDecayRate));
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -52,7 +52,7 @@ TEST(DynamicHistogramTest, addWithDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.00001;
   DynamicHistogram uut(
-      DynamicHistogramOpts().set_num_buckets(31).set_decay_rate(kDecayRate));
+      DynamicHistogramOpts().setNumBuckets(31).setDecayRate(kDecayRate));
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -82,7 +82,7 @@ TEST(DynamicHistogramTest, multithreadedStress) {
   std::thread threads[kNumThreads];
 
   DynamicHistogram uut(
-      DynamicHistogramOpts().set_num_buckets(31).set_decay_rate(0.00001));
+      DynamicHistogramOpts().setNumBuckets(31).setDecayRate(0.00001));
 
   for (int tx = 0; tx < kNumThreads; tx++) {
     threads[tx] = std::thread(
@@ -113,7 +113,7 @@ TEST(DynamicHistogramTest, multithreadedStress) {
 }
 
 TEST(DynamicHistogramTest, getMean) {
-  DynamicHistogram uut(DynamicHistogramOpts().set_num_buckets(61));
+  DynamicHistogram uut(DynamicHistogramOpts().setNumBuckets(61));
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 
@@ -126,9 +126,9 @@ TEST(DynamicHistogramTest, getMean) {
 }
 
 TEST(DynamicHistogramTest, asProto) {
-  DynamicHistogram uut(DynamicHistogramOpts().set_num_buckets(61));
-  uut.mutable_description()->set_title("test");
-  uut.mutable_description()->set_labels({"x-value"});
+  DynamicHistogram uut(DynamicHistogramOpts().setNumBuckets(61));
+  uut.mutableDescription()->setTitle("test");
+  uut.mutableDescription()->setLabels({"x-value"});
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 

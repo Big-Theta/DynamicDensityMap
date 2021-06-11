@@ -26,29 +26,29 @@ namespace dyden {
 
 DynamicHistogram::DynamicHistogram(const DynamicHistogramOpts& opts)
     : DensityMapBase(DescriptionOpts()
-                         .set_type(MapType::HISTOGRAM)
-                         .set_decay_rate(opts.decay_rate())
-                         .set_refresh_interval(opts.refresh_interval())
-                         .set_title(opts.title())
-                         .set_labels({opts.label()})
-                         .set_num_containers(opts.num_buckets())),
+                         .setType(MapType::HISTOGRAM)
+                         .setDecayRate(opts.decayRate())
+                         .setRefreshInterval(opts.refreshInterval())
+                         .setTitle(opts.title())
+                         .setLabels({opts.label()})
+                         .setNumContainers(opts.numBuckets())),
       generation_(0),
       refresh_generation_(0),
       total_count_(0.0),
       split_threshold_(0.0),
-      insertion_buffer_(/*buffer_size=*/2 * opts.refresh_interval()) {
-  ubounds_.resize(opts.num_buckets());
+      insertion_buffer_(/*buffer_size=*/2 * opts.refreshInterval()) {
+  ubounds_.resize(opts.numBuckets());
   ubounds_.back() = std::numeric_limits<double>::max();
-  counts_.resize(opts.num_buckets());
-  bucket_generation_.resize(opts.num_buckets());
-  if (opts.register_with_server()) {
+  counts_.resize(opts.numBuckets());
+  bucket_generation_.resize(opts.numBuckets());
+  if (opts.registerWithServer()) {
     registerWithServer();
   }
 }
 
 void DynamicHistogram::addValue(double val) {
   size_t unflushed = insertion_buffer_.addValue(val);
-  if (unflushed >= description().refresh_interval()) {
+  if (unflushed >= description().refreshInterval()) {
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
   }
@@ -192,7 +192,8 @@ std::string DynamicHistogram::debugString() {
          "): " + std::to_string(counts_[i]) + "\n";
   }
   s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
-       ", " + std::to_string(getMaxNoLock()) + "): " + std::to_string(counts_[i]);
+       ", " + std::to_string(getMaxNoLock()) +
+       "): " + std::to_string(counts_[i]);
   return s;
 }
 
@@ -253,9 +254,7 @@ void DynamicHistogram::registerWithServer() {
 
 double DynamicHistogram::splitThreshold() const { return split_threshold_; }
 
-double DynamicHistogram::decay_rate() const {
-  return description().decay_rate();
-}
+double DynamicHistogram::decayRate() const { return description().decayRate(); }
 
 double DynamicHistogram::getMinNoLock() const {
   if (counts_[1] == 0) {
@@ -297,8 +296,8 @@ void DynamicHistogram::flushValue(double val) {
 
   size_t bx = insertValue(val);
 
-  if (decay_rate() != 0.0) {
-    total_count_ = total_count_ * (1.0 - decay_rate()) + 1.0;
+  if (decayRate() != 0.0) {
+    total_count_ = total_count_ * (1.0 - decayRate()) + 1.0;
   } else {
     total_count_ = generation_;
   }
@@ -316,10 +315,10 @@ void DynamicHistogram::flushValue(double val) {
 void DynamicHistogram::decay(size_t bx) {
   uint64_t old_generation = bucket_generation_[bx];
   bucket_generation_[bx] = generation_;
-  if (decay_rate() == 0.0) {
+  if (decayRate() == 0.0) {
     return;
   }
-  counts_[bx] *= description().decay_factor(generation_ - old_generation);
+  counts_[bx] *= description().decayFactor(generation_ - old_generation);
   bucket_generation_[bx] = generation_;
 }
 
@@ -351,9 +350,9 @@ void DynamicHistogram::refresh() {
     split_threshold_ = 2 * total_count_ / getNumBuckets();
   }
 
-  if (static_cast<int32_t>(getNumBuckets()) != description().num_containers()) {
+  if (static_cast<int32_t>(getNumBuckets()) != description().numContainers()) {
     while (static_cast<int32_t>(getNumBuckets()) <
-           description().num_containers()) {
+           description().numContainers()) {
       size_t bx = 0;
       double highest_count = counts_[0];
       for (size_t i = 1; i < counts_.size(); i++) {
@@ -366,7 +365,7 @@ void DynamicHistogram::refresh() {
     }
 
     while (static_cast<int32_t>(getNumBuckets()) >
-           description().num_containers()) {
+           description().numContainers()) {
       merge();
     }
 

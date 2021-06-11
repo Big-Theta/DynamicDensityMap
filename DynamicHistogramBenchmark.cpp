@@ -34,8 +34,7 @@ static void BM_DynamicHistogramAddDecay(benchmark::State &state) {
   }
 
   dyden::DynamicHistogram uut(
-      dyden::DynamicHistogramOpts().set_num_buckets(100).set_decay_rate(
-          0.0001));
+      dyden::DynamicHistogramOpts().setNumBuckets(100).setDecayRate(0.0001));
 
   int x_idx = 0;
   int size = xvals.size();
@@ -61,7 +60,7 @@ void BM_DynamicHistogramAddNoDecay(benchmark::State &state) {
   }
 
   dyden::DynamicHistogram uut(
-      dyden::DynamicHistogramOpts().set_num_buckets(100).set_decay_rate(0.0));
+      dyden::DynamicHistogramOpts().setNumBuckets(100).setDecayRate(0.0));
 
   int x_idx = 0;
   int size = xvals.size();
@@ -87,7 +86,7 @@ static void BM_DynamicKDEAddDecay(benchmark::State &state) {
   }
 
   dyden::DynamicKDE uut(
-      dyden::DynamicKDEOpts().set_num_kernels(100).set_decay_rate(0.0001));
+      dyden::DynamicKDEOpts().setNumKernels(100).setDecayRate(0.0001));
 
   int x_idx = 0;
   int size = xvals.size();
@@ -113,7 +112,7 @@ void BM_DynamicKDEAddNoDecay(benchmark::State &state) {
   }
 
   dyden::DynamicKDE uut(
-      dyden::DynamicKDEOpts().set_num_kernels(100).set_decay_rate(0.0));
+      dyden::DynamicKDEOpts().setNumKernels(100).setDecayRate(0.0));
 
   int x_idx = 0;
   int size = xvals.size();
@@ -141,7 +140,7 @@ void BM_DynamicKDE2DAddDecay(benchmark::State &state) {
   }
 
   dyden::DynamicKDE2D uut(
-      dyden::DynamicKDE2DOpts().set_num_kernels(100).set_decay_rate(0.0001));
+      dyden::DynamicKDE2DOpts().setNumKernels(100).setDecayRate(0.0001));
 
   int x_idx = 0;
   int y_idx = 0;
@@ -174,7 +173,7 @@ void BM_DynamicKDE2DAddNoDecay(benchmark::State &state) {
   }
 
   dyden::DynamicKDE2D uut(
-      dyden::DynamicKDE2DOpts().set_num_kernels(100).set_decay_rate(0.0));
+      dyden::DynamicKDE2DOpts().setNumKernels(100).setDecayRate(0.0));
 
   int x_idx = 0;
   int y_idx = 0;

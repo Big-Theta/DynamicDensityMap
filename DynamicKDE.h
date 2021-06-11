@@ -94,41 +94,41 @@ class DynamicKDEOpts {
         label_("label"),
         register_with_server_(false) {}
 
-  DynamicKDEOpts& set_num_kernels(size_t num_kernels) {
+  DynamicKDEOpts& setNumKernels(size_t num_kernels) {
     num_kernels_ = num_kernels;
     return *this;
   }
-  size_t num_kernels() const { return num_kernels_; }
+  size_t numKernels() const { return num_kernels_; }
 
-  DynamicKDEOpts& set_decay_rate(double decay_rate) {
+  DynamicKDEOpts& setDecayRate(double decay_rate) {
     decay_rate_ = decay_rate;
     return *this;
   }
-  double decay_rate() const { return decay_rate_; }
+  double decayRate() const { return decay_rate_; }
 
-  DynamicKDEOpts& set_refresh_interval(size_t refresh_interval) {
+  DynamicKDEOpts& setRefreshInterval(size_t refresh_interval) {
     refresh_interval_ = refresh_interval;
     return *this;
   }
-  size_t refresh_interval() const { return refresh_interval_; }
+  size_t refreshInterval() const { return refresh_interval_; }
 
-  DynamicKDEOpts& set_title(std::string title) {
+  DynamicKDEOpts& setTitle(std::string title) {
     title_ = title;
     return *this;
   }
   std::string title() const { return title_; }
 
-  DynamicKDEOpts& set_label(std::string label) {
+  DynamicKDEOpts& setLabel(std::string label) {
     label_ = label;
     return *this;
   }
   std::string label() const { return label_; }
 
-  DynamicKDEOpts& set_register_with_server(bool register_with_server) {
+  DynamicKDEOpts& setRegisterWithServer(bool register_with_server) {
     register_with_server_ = register_with_server;
     return *this;
   }
-  bool register_with_server() const { return register_with_server_; }
+  bool registerWithServer() const { return register_with_server_; }
 
  private:
   size_t num_kernels_;
@@ -175,7 +175,7 @@ class DynamicKDE : public DensityMapBase {
 
   double splitThreshold() const;
 
-  double decay_rate() const;
+  double decayRate() const;
 
   void flush(FlushIterator<double>* flush_it);
 

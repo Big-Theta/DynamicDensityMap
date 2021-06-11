@@ -20,27 +20,27 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <sys/time.h>
-
 #include "DensityMapDescription.h"
+
+#include <sys/time.h>
 
 namespace dyden {
 
 void Description::setFromProto(const DensityMapDescription& proto) {
-  set_title(proto.title());
+  setTitle(proto.title());
   labels_.clear();
   for (auto label : proto.labels()) {
     labels_.push_back(label);
   }
-  set_decay_rate(proto.decay_rate());
-  set_num_containers(proto.num_containers());
+  setDecayRate(proto.decay_rate());
+  setNumContainers(proto.num_containers());
 }
 
-void Description::set_decay_rate(double rate) {
+void Description::setDecayRate(double rate) {
   // Keep this in line with the size of the InsertionBuffer.
-  decay_factors_.resize(2 * refresh_interval());
+  decay_factors_.resize(2 * refreshInterval());
   double decay = 1.0;
-  for (size_t i = 0; i < refresh_interval(); i++) {
+  for (size_t i = 0; i < refreshInterval(); i++) {
     decay_factors_[i] = decay;
     decay *= 1.0 - rate;
   }
@@ -68,7 +68,7 @@ void Description::toProto(DensityMapDescription* proto) const {
   proto->mutable_timestamp()->set_seconds(tv.tv_sec);
   proto->mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
 
-  proto->set_decay_rate(decay_rate());
+  proto->set_decay_rate(decayRate());
 
   if (type_ == MapType::HISTOGRAM) {
     proto->set_type(DensityMapDescription::HISTOGRAM);
@@ -78,7 +78,7 @@ void Description::toProto(DensityMapDescription* proto) const {
     proto->set_type(DensityMapDescription::KDE2D);
   }
 
-  proto->set_num_containers(num_containers());
+  proto->set_num_containers(numContainers());
 }
 
 /*static*/

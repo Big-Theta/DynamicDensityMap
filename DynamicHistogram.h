@@ -70,41 +70,41 @@ class DynamicHistogramOpts {
         label_("label"),
         register_with_server_(false) {}
 
-  DynamicHistogramOpts& set_num_buckets(size_t num_buckets) {
+  DynamicHistogramOpts& setNumBuckets(size_t num_buckets) {
     num_buckets_ = num_buckets;
     return *this;
   }
-  size_t num_buckets() const { return num_buckets_; }
+  size_t numBuckets() const { return num_buckets_; }
 
-  DynamicHistogramOpts& set_decay_rate(double decay_rate) {
+  DynamicHistogramOpts& setDecayRate(double decay_rate) {
     decay_rate_ = decay_rate;
     return *this;
   }
-  double decay_rate() const { return decay_rate_; }
+  double decayRate() const { return decay_rate_; }
 
-  DynamicHistogramOpts& set_refresh_interval(size_t refresh_interval) {
+  DynamicHistogramOpts& setRefreshInterval(size_t refresh_interval) {
     refresh_interval_ = refresh_interval;
     return *this;
   }
-  size_t refresh_interval() const { return refresh_interval_; }
+  size_t refreshInterval() const { return refresh_interval_; }
 
-  DynamicHistogramOpts& set_title(std::string title) {
+  DynamicHistogramOpts& setTitle(std::string title) {
     title_ = title;
     return *this;
   }
   std::string title() const { return title_; }
 
-  DynamicHistogramOpts& set_label(std::string label) {
+  DynamicHistogramOpts& setLabel(std::string label) {
     label_ = label;
     return *this;
   }
   std::string label() const { return label_; }
 
-  DynamicHistogramOpts& set_register_with_server(bool register_with_server) {
+  DynamicHistogramOpts& setRegisterWithServer(bool register_with_server) {
     register_with_server_ = register_with_server;
     return *this;
   }
-  bool register_with_server() const { return register_with_server_; }
+  bool registerWithServer() const { return register_with_server_; }
 
  private:
   size_t num_buckets_;
@@ -167,7 +167,7 @@ class DynamicHistogram : public DensityMapBase {
 
   double splitThreshold() const;
 
-  double decay_rate() const;
+  double decayRate() const;
 
   double getMinNoLock() const;
 

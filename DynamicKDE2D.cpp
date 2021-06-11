@@ -58,10 +58,10 @@ Kernel2D& Kernel2D::operator=(const Kernel2D& other) {
 }
 
 std::string Kernel2D::debugString() const {
-  std::string s = "Kernel2D{mean_x: " + std::to_string(mean_x()) +
-                  ", mean_y: " + std::to_string(mean_y()) +
-                  ", variance_xx: " + std::to_string(variance_xx()) +
-                  ", variance_yy: " + std::to_string(variance_yy()) +
+  std::string s = "Kernel2D{mean_x: " + std::to_string(meanX()) +
+                  ", mean_y: " + std::to_string(meanY()) +
+                  ", variance_xx: " + std::to_string(varianceXX()) +
+                  ", variance_yy: " + std::to_string(varianceYY()) +
                   ", covariance: " + std::to_string(covariance()) +
                   ", weighted_sum: " + std::to_string(weighted_sum_) + "}";
   return s;
@@ -97,18 +97,18 @@ void Kernel2D::decay(double factor, uint64_t new_generation) {
   Sxy_ *= factor;
 }
 
-double Kernel2D::mean_x() const { return mean_x_; }
+double Kernel2D::meanX() const { return mean_x_; }
 
-double Kernel2D::mean_y() const { return mean_y_; }
+double Kernel2D::meanY() const { return mean_y_; }
 
-double Kernel2D::variance_xx() const {
+double Kernel2D::varianceXX() const {
   if (weighted_sum_ == 0.0) {
     return 0.0;
   }
   return Sxx_ / weighted_sum_;
 }
 
-double Kernel2D::variance_yy() const {
+double Kernel2D::varianceYY() const {
   if (weighted_sum_ == 0.0) {
     return 0.0;
   }
@@ -128,10 +128,10 @@ uint64_t Kernel2D::generation() const { return generation_; }
 
 void Kernel2D::populateProto(
     ::dynamic_density::DynamicKDE_Kernel* proto) const {
-  proto->add_coord(mean_x());
-  proto->add_coord(mean_y());
-  proto->add_variance(variance_xx());
-  proto->add_variance(variance_yy());
+  proto->add_coord(meanX());
+  proto->add_coord(meanY());
+  proto->add_variance(varianceXX());
+  proto->add_variance(varianceYY());
   proto->set_covariance(covariance());
   proto->set_count(count());
 }
@@ -159,10 +159,10 @@ Kernel2D Kernel2D::merge(const Kernel2D& a, const Kernel2D& b) {
         (a.mean_y_ * a.weighted_sum_ + b.mean_y_ * b.weighted_sum_) /
         weighted_sum;
 
-    kernel.Sxx_ = (a.weighted_sum_ - 1.0) * a.variance_xx() +
-                  (b.weighted_sum_ - 1.0) * b.variance_xx();
-    kernel.Syy_ = (a.weighted_sum_ - 1.0) * a.variance_yy() +
-                  (b.weighted_sum_ - 1.0) * b.variance_yy();
+    kernel.Sxx_ = (a.weighted_sum_ - 1.0) * a.varianceXX() +
+                  (b.weighted_sum_ - 1.0) * b.varianceXX();
+    kernel.Syy_ = (a.weighted_sum_ - 1.0) * a.varianceYY() +
+                  (b.weighted_sum_ - 1.0) * b.varianceYY();
     kernel.Sxy_ = (a.weighted_sum_ - 1.0) * a.covariance() +
                   (b.weighted_sum_ - 1.0) * b.covariance();
   }
@@ -176,27 +176,27 @@ Kernel2D Kernel2D::merge(const Kernel2D& a, const Kernel2D& b) {
 
 DynamicKDE2D::DynamicKDE2D(const DynamicKDE2DOpts& opts)
     : DensityMapBase(DescriptionOpts()
-                         .set_type(MapType::KDE2D)
-                         .set_decay_rate(opts.decay_rate())
-                         .set_refresh_interval(opts.refresh_interval())
-                         .set_title(opts.title())
-                         .set_labels(opts.labels())
-                         .set_num_containers(opts.num_kernels())),
+                         .setType(MapType::KDE2D)
+                         .setDecayRate(opts.decayRate())
+                         .setRefreshInterval(opts.refreshInterval())
+                         .setTitle(opts.title())
+                         .setLabels(opts.labels())
+                         .setNumContainers(opts.numKernels())),
       generation_(0),
       refresh_generation_(0),
       total_count_(0.0),
       split_threshold_(0.0),
-      insertion_buffer_(/*buffer_size=*/2 * opts.refresh_interval()) {
-  kernels_.reserve(opts.num_kernels() + 2);
-  kernels_.resize(opts.num_kernels());
-  if (opts.register_with_server()) {
+      insertion_buffer_(/*buffer_size=*/2 * opts.refreshInterval()) {
+  kernels_.reserve(opts.numKernels() + 2);
+  kernels_.resize(opts.numKernels());
+  if (opts.registerWithServer()) {
     registerWithServer();
   }
 }
 
 void DynamicKDE2D::addValue(double x, double y) {
   size_t unflushed = insertion_buffer_.addValue(std::make_pair(x, y));
-  if (unflushed >= description().refresh_interval()) {
+  if (unflushed >= description().refreshInterval()) {
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
   }
@@ -251,7 +251,7 @@ void DynamicKDE2D::registerWithServer() {
 
 double DynamicKDE2D::splitThreshold() const { return split_threshold_; }
 
-double DynamicKDE2D::decay_rate() const { return description().decay_rate(); }
+double DynamicKDE2D::decayRate() const { return description().decayRate(); }
 
 void DynamicKDE2D::flush(FlushIterator<std::pair<double, double>>* flush_it) {
   for (; *flush_it; ++(*flush_it)) {
@@ -262,6 +262,7 @@ void DynamicKDE2D::flush(FlushIterator<std::pair<double, double>>* flush_it) {
 
 void DynamicKDE2D::flushValue(const std::pair<double, double>& val) {
   static constexpr size_t N = 4;
+  static constexpr double kCountPerKernel = 1.0 / N;
   std::vector<size_t> best_kxs;
   best_kxs.resize(N);
   double best_distances[N];
@@ -271,8 +272,8 @@ void DynamicKDE2D::flushValue(const std::pair<double, double>& val) {
 
   for (size_t kx = 0; kx < kernels_.size(); kx++) {
     const auto& kernel = kernels_[kx];
-    double dx = kernel.mean_x() - val.first;
-    double dy = kernel.mean_y() - val.second;
+    double dx = kernel.meanX() - val.first;
+    double dy = kernel.meanY() - val.second;
     double dist = dx * dx + dy * dy;
 
     if (dist >= best_distances[N - 1]) {
@@ -298,10 +299,9 @@ void DynamicKDE2D::flushValue(const std::pair<double, double>& val) {
   std::sort(best_kxs.begin(), best_kxs.end());
   for (auto kx_it = best_kxs.rbegin(); kx_it != best_kxs.rend(); ++kx_it) {
     auto* kernel = &kernels_[*kx_it];
-    kernel->decay(
-        description().decay_factor(generation_ - kernel->generation()),
-        generation_);
-    kernel->addValue(val.first, val.second, 0.25);
+    kernel->decay(description().decayFactor(generation_ - kernel->generation()),
+                  generation_);
+    kernel->addValue(val.first, val.second, kCountPerKernel);
     if (kernel->count() > splitThreshold()) {
       split(*kx_it);
       num_splits++;
@@ -312,8 +312,8 @@ void DynamicKDE2D::flushValue(const std::pair<double, double>& val) {
     merge();
   }
 
-  if (decay_rate() != 0.0) {
-    total_count_ = total_count_ * (1.0 - decay_rate()) + 1.0;
+  if (decayRate() != 0.0) {
+    total_count_ = total_count_ * (1.0 - decayRate()) + 1.0;
   } else {
     total_count_ = generation_;
   }
@@ -346,9 +346,9 @@ void DynamicKDE2D::refresh() {
     split_threshold_ = 2 * total_count_ / getNumKernels();
   }
 
-  if (static_cast<int32_t>(getNumKernels()) != description().num_containers()) {
+  if (static_cast<int32_t>(getNumKernels()) != description().numContainers()) {
     while (static_cast<int32_t>(getNumKernels()) <
-           description().num_containers()) {
+           description().numContainers()) {
       size_t kx = 0;
       double highest_count = kernels_[0].count();
       for (size_t i = 1; i < kernels_.size(); i++) {
@@ -361,7 +361,7 @@ void DynamicKDE2D::refresh() {
     }
 
     while (static_cast<int32_t>(getNumKernels()) >
-           description().num_containers()) {
+           description().numContainers()) {
       merge();
     }
 
@@ -372,7 +372,7 @@ void DynamicKDE2D::refresh() {
 void DynamicKDE2D::decayAll() {
   for (size_t kx = 0; kx < kernels_.size(); kx++) {
     kernels_[kx].decay(
-        description().decay_factor(generation_ - kernels_[kx].generation()),
+        description().decayFactor(generation_ - kernels_[kx].generation()),
         generation_);
   }
 }
@@ -413,8 +413,8 @@ size_t DynamicKDE2D::closest(size_t kx) {
     if (x == kx) {
       continue;
     }
-    double dx = kernels_[kx].mean_x() - kernels_[x].mean_x();
-    double dy = kernels_[kx].mean_y() - kernels_[x].mean_y();
+    double dx = kernels_[kx].meanX() - kernels_[x].meanX();
+    double dy = kernels_[kx].meanY() - kernels_[x].meanY();
     double dist = dx * dx + dy * dy;
     if (dist < best_dist) {
       best_dist = dist;

@@ -32,7 +32,7 @@ DensityMapRegistry& DensityMapRegistry::getInstance() {
 
 void DensityMapRegistry::registerDensityMap(DensityMapBase* density_map) {
   std::scoped_lock l(mutex_);
-  density_map->mutable_description()->set_identity(next_identity_++);
+  density_map->mutableDescription()->setIdentity(next_identity_++);
   density_maps_.emplace_back(density_map);
 }
 
@@ -69,7 +69,7 @@ Status DensityMapRegistry::SetDensityMapOptions(
   int32_t id = request.identifier().identity();
   for (auto* density_map : density_maps_) {
     if (density_map->description().identifier().identity() == id) {
-      density_map->mutable_description()->setFromProto(request);
+      density_map->mutableDescription()->setFromProto(request);
       density_map->description().toProto(reply);
       return Status::OK;
     }
@@ -89,7 +89,7 @@ void DynamicDensityServiceImpl::Run(std::string address) {
   builder.RegisterService(&service_);
   cq_ = builder.AddCompletionQueue();
   server_ = builder.BuildAndStart();
-  printf("Server listening on %s\n", address.c_str());
+  printf("DensityMapServer listening on %s\n", address.c_str());
   HandleRpcs();
 }
 

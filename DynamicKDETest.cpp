@@ -101,8 +101,7 @@ TEST(KernelTest, populateProto) {
 TEST(DynamicKDETest, addNoDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.0;
-  DynamicKDE uut(
-      DynamicKDEOpts().set_num_kernels(31).set_decay_rate(kDecayRate));
+  DynamicKDE uut(DynamicKDEOpts().setNumKernels(31).setDecayRate(kDecayRate));
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -121,8 +120,7 @@ TEST(DynamicKDETest, addNoDecay) {
 TEST(DynamicKDETest, addWithDecay) {
   static constexpr int kNumValues = 100000;
   static constexpr double kDecayRate = 0.00001;
-  DynamicKDE uut(
-      DynamicKDEOpts().set_num_kernels(31).set_decay_rate(kDecayRate));
+  DynamicKDE uut(DynamicKDEOpts().setNumKernels(31).setDecayRate(kDecayRate));
   std::default_random_engine gen;
   std::normal_distribution<double> norm(0.0, 1.0);
 
@@ -140,9 +138,9 @@ TEST(DynamicKDETest, addWithDecay) {
 }
 
 TEST(DynamicKDETest, asProto) {
-  DynamicKDE uut(DynamicKDEOpts().set_num_kernels(61));
-  uut.mutable_description()->set_title("test");
-  uut.mutable_description()->set_labels({"x-value"});
+  DynamicKDE uut(DynamicKDEOpts().setNumKernels(61));
+  uut.mutableDescription()->setTitle("test");
+  uut.mutableDescription()->setLabels({"x-value"});
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 
@@ -168,7 +166,7 @@ TEST(DynamicKDETest, asProto) {
 }
 
 TEST(DynamicKDETest, count) {
-  DynamicKDE uut(DynamicKDEOpts().set_num_kernels(61));
+  DynamicKDE uut(DynamicKDEOpts().setNumKernels(61));
   std::normal_distribution<double> norm(10000.0, 1.0);
   std::default_random_engine gen;
 

@@ -28,19 +28,19 @@
 
 namespace dyden {
 
-using ::dynamic_density::DensityMapIdentifier;
 using ::dynamic_density::DensityMapDescription;
+using ::dynamic_density::DensityMapIdentifier;
 
 class Identifier {
  public:
-  Identifier(): identity_(0) {}
+  Identifier() : identity_(0) {}
 
   int32_t identity() const { return identity_; }
 
  protected:
   friend class Description;
 
-  void set_identity(int32_t identity) { identity_ = identity; }
+  void setIdentity(int32_t identity) { identity_ = identity; }
 
  private:
   int32_t identity_;
@@ -61,37 +61,37 @@ class DescriptionOpts {
         num_containers_(100) {}
 
   MapType type() const { return type_; }
-  DescriptionOpts& set_type(MapType type) {
+  DescriptionOpts& setType(MapType type) {
     type_ = type;
     return *this;
   }
 
-  double decay_rate() const { return decay_rate_; }
-  DescriptionOpts& set_decay_rate(double decay_rate) {
+  double decayRate() const { return decay_rate_; }
+  DescriptionOpts& setDecayRate(double decay_rate) {
     decay_rate_ = decay_rate;
     return *this;
   }
 
-  size_t refresh_interval() const { return refresh_interval_; }
-  DescriptionOpts& set_refresh_interval(size_t refresh_interval) {
+  size_t refreshInterval() const { return refresh_interval_; }
+  DescriptionOpts& setRefreshInterval(size_t refresh_interval) {
     refresh_interval_ = refresh_interval;
     return *this;
   }
 
   const std::string& title() const { return title_; }
-  DescriptionOpts& set_title(std::string title) {
+  DescriptionOpts& setTitle(std::string title) {
     title_ = title;
     return *this;
   }
 
   std::vector<std::string> labels() const { return labels_; }
-  DescriptionOpts& set_labels(std::vector<std::string> labels) {
+  DescriptionOpts& setLabels(std::vector<std::string> labels) {
     labels_ = labels;
     return *this;
   }
 
-  int32_t num_containers() const { return num_containers_; }
-  DescriptionOpts& set_num_containers(int32_t num_containers) {
+  int32_t numContainers() const { return num_containers_; }
+  DescriptionOpts& setNumContainers(int32_t num_containers) {
     num_containers_ = num_containers;
     return *this;
   }
@@ -110,10 +110,10 @@ class Description {
   Description(const DescriptionOpts& opts)
       : title_(opts.title()),
         labels_(opts.labels()),
-        refresh_interval_(opts.refresh_interval()),
+        refresh_interval_(opts.refreshInterval()),
         type_(opts.type()),
-        num_containers_(opts.num_containers()) {
-    set_decay_rate(opts.decay_rate());
+        num_containers_(opts.numContainers()) {
+    setDecayRate(opts.decayRate());
   }
 
   const Identifier& identifier() const { return identifier_; }
@@ -121,20 +121,20 @@ class Description {
   void setFromProto(const DensityMapDescription& proto);
 
   const std::string& title() const { return title_; }
-  void set_title(std::string title) { title_ = title; }
+  void setTitle(std::string title) { title_ = title; }
 
   const std::vector<std::string> labels() const { return labels_; }
-  void set_labels(std::vector<std::string> labels) { labels_ = labels; }
+  void setLabels(std::vector<std::string> labels) { labels_ = labels; }
 
-  double decay_rate() const { return decay_rate_; }
-  void set_decay_rate(double rate);
+  double decayRate() const { return decay_rate_; }
+  void setDecayRate(double rate);
 
-  int32_t num_containers() const { return num_containers_; }
-  void set_num_containers(int32_t num_containers) {
+  int32_t numContainers() const { return num_containers_; }
+  void setNumContainers(int32_t num_containers) {
     num_containers_ = num_containers;
   }
 
-  size_t refresh_interval() const { return refresh_interval_; }
+  size_t refreshInterval() const { return refresh_interval_; }
 
   DensityMapDescription asProto() const;
   void toProto(DensityMapDescription* proto) const;
@@ -149,11 +149,9 @@ class Description {
   friend class DynamicKDE;
   friend class DynamicKDE2D;
 
-  void set_identity(int32_t identity) {
-    identifier_.set_identity(identity);
-  }
+  void setIdentity(int32_t identity) { identifier_.setIdentity(identity); }
 
-  double decay_factor(uint64_t generations) const {
+  double decayFactor(uint64_t generations) const {
     assert(generations < decay_factors_.size());
     return decay_factors_[generations];
   }
