@@ -141,7 +141,11 @@ def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
     f = np.zeros((len(xx), len(yy)))
 
     memo = {}
+    def rounded(r):
+        return (round(r[0], 12), round(r[1], 12))
+
     def memo_or_cdf(dist, r):
+        r = rounded(r)
         if (dist, r) not in memo:
             memo[(dist, r)] = dist.cdf(r)
         return memo[(dist, r)]
