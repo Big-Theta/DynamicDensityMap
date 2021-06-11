@@ -169,9 +169,9 @@ class DynamicHistogram : public DensityMapBase {
 
   double decay_rate() const;
 
-  double getMinRaw() const;
+  double getMinNoLock() const;
 
-  double getMaxRaw() const;
+  double getMaxNoLock() const;
 
   double getUpperBound(int i) const;
 

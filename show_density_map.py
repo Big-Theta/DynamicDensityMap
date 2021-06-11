@@ -74,15 +74,14 @@ def prepare_render_hist(
         f[i] = this_cdf - last_cdf
         last_cdf = this_cdf
 
-    title = proto.description.title
-    label = ""
-    if len(proto.description.labels):
-        label = proto.description.labels[0]
-
     pyplot.clf()
+
+    title = proto.description.title
+    if len(proto.description.labels):
+        pyplot.xlabel(proto.description.labels[0])
+
     pyplot.title(title)
-    pyplot.fill_between(x_d, f, alpha=alpha, label=label)
-    pyplot.legend()
+    pyplot.fill_between(x_d, f, alpha=alpha)
 
 
 def prepare_render_dkde(proto: DynamicDensity_pb2.DynamicKDE,
@@ -105,15 +104,14 @@ def prepare_render_dkde(proto: DynamicDensity_pb2.DynamicKDE,
             f[i] += (cdf - last_cdf) * weight
             last_cdf = cdf
 
-    title = proto.description.title
-    label = ""
-    if len(proto.description.labels):
-        label = proto.description.labels[0]
-
     pyplot.clf()
+
+    title = proto.description.title
+    if len(proto.description.labels):
+        pyplot.xlabel(proto.description.labels[0])
+
     pyplot.title(title)
-    pyplot.fill_between(x_d, f, alpha=alpha, label=label)
-    pyplot.legend()
+    pyplot.fill_between(x_d, f, alpha=alpha)
 
 
 def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
@@ -193,6 +191,7 @@ def prepare_render_dkde_2d(proto: DynamicDensity_pb2.DynamicKDE,
         ax.set_xlabel(proto_labels[0], fontsize=18)
     if len(proto_labels) >= 2:
         ax.set_ylabel(proto_labels[1], fontsize=18)
+
     return ax.plot_surface(xx, yy, f, cmap='viridis', edgecolor='none')
 
 
@@ -260,6 +259,7 @@ def interact_with_server():
         proto_desc.title = desc.get("title", "")
         proto_desc.labels[:] = desc.get("labels", [])
         proto_desc.decay_rate = desc.get("decay_rate", 0.0)
+        proto_desc.num_containers = desc.get("num_containers", 100)
         print(query_server(request))
         return
 

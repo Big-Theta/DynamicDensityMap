@@ -30,7 +30,8 @@ DynamicHistogram::DynamicHistogram(const DynamicHistogramOpts& opts)
                          .set_decay_rate(opts.decay_rate())
                          .set_refresh_interval(opts.refresh_interval())
                          .set_title(opts.title())
-                         .set_labels({opts.label()})),
+                         .set_labels({opts.label()})
+                         .set_num_containers(opts.num_buckets())),
       generation_(0),
       refresh_generation_(0),
       total_count_(0.0),
@@ -58,14 +59,14 @@ Bucket DynamicHistogram::getBucketByIndex(size_t bx) {
   if (bx > 0) {
     min = ubounds_[bx - 1];
   } else {
-    min = getMinRaw();
+    min = getMinNoLock();
   }
 
   double max;
   if (bx + 1 < ubounds_.size()) {
     max = ubounds_[bx];
   } else {
-    max = getMaxRaw();
+    max = getMaxNoLock();
   }
 
   decay(bx);
@@ -82,13 +83,13 @@ double DynamicHistogram::computeTotalCount() {
 double DynamicHistogram::getMin() {
   auto flush_it = insertion_buffer_.lockedIterator();
   flush(&flush_it);
-  return getMinRaw();
+  return getMinNoLock();
 }
 
 double DynamicHistogram::getMax() {
   auto flush_it = insertion_buffer_.lockedIterator();
   flush(&flush_it);
-  return getMaxRaw();
+  return getMaxNoLock();
 }
 
 double DynamicHistogram::getMean() {
@@ -96,7 +97,7 @@ double DynamicHistogram::getMean() {
   flush(&flush_it);
 
   double mean = 0.0;
-  mean += counts_[0] * (getMinRaw() + ubounds_[0]) / 2 / total_count_;
+  mean += counts_[0] * (getMinNoLock() + ubounds_[0]) / 2 / total_count_;
 
   size_t i = 1;
   for (; i < counts_.size() - 1; i++) {
@@ -104,7 +105,7 @@ double DynamicHistogram::getMean() {
     mean += counts_[i] * new_val / total_count_;
   }
 
-  mean += counts_[i] * (ubounds_[i - 1] + getMaxRaw()) / 2 / total_count_;
+  mean += counts_[i] * (ubounds_[i - 1] + getMaxNoLock()) / 2 / total_count_;
   return mean;
 }
 
@@ -132,7 +133,7 @@ double DynamicHistogram::getQuantileEstimate(double quantile) {
 
   double lower_bound;
   if (bx == 0) {
-    lower_bound = getMinRaw();
+    lower_bound = getMinNoLock();
   } else {
     lower_bound = ubounds_[bx - 1];
   }
@@ -141,7 +142,7 @@ double DynamicHistogram::getQuantileEstimate(double quantile) {
   if (bx + 1 < ubounds_.size()) {
     upper_bound = ubounds_[bx];
   } else {
-    upper_bound = getMaxRaw();
+    upper_bound = getMaxNoLock();
   }
 
   return frac * (upper_bound - lower_bound) + lower_bound;
@@ -151,12 +152,12 @@ double DynamicHistogram::getQuantileOfValue(double value) {
   auto flush_it = insertion_buffer_.lockedIterator();
   flush(&flush_it);
 
-  if (value <= getMinRaw()) {
-    return getMinRaw();
+  if (value <= getMinNoLock()) {
+    return getMinNoLock();
   }
 
-  if (value >= getMaxRaw()) {
-    return getMaxRaw();
+  if (value >= getMaxNoLock()) {
+    return getMaxNoLock();
   }
 
   double count = 0.0;
@@ -182,7 +183,7 @@ std::string DynamicHistogram::debugString() {
        "\n"
        "total_count: " +
        std::to_string(total_count_) + "\n";
-  s += "  " + std::to_string(0) + " [" + std::to_string(getMinRaw()) + ", " +
+  s += "  " + std::to_string(0) + " [" + std::to_string(getMinNoLock()) + ", " +
        std::to_string(ubounds_[0]) + "): " + std::to_string(counts_[0]) + "\n";
   size_t i = 1;
   for (; i < counts_.size() - 1; i++) {
@@ -191,7 +192,7 @@ std::string DynamicHistogram::debugString() {
          "): " + std::to_string(counts_[i]) + "\n";
   }
   s += "  " + std::to_string(i) + " [" + std::to_string(ubounds_[i - 1]) +
-       ", " + std::to_string(getMaxRaw()) + "): " + std::to_string(counts_[i]);
+       ", " + std::to_string(getMaxNoLock()) + "): " + std::to_string(counts_[i]);
   return s;
 }
 
@@ -206,11 +207,11 @@ std::string DynamicHistogram::json() {
   if (!description().labels().empty()) {
     s += "  \"label\": \"" + description().labels()[0] + "\",\n";
   }
-  s += "  \"bounds\": [" + std::to_string(getMinRaw()) + ", ";
+  s += "  \"bounds\": [" + std::to_string(getMinNoLock()) + ", ";
   for (size_t i = 0; i + 1 < ubounds_.size(); i++) {
     s += std::to_string(ubounds_[i]) + ", ";
   }
-  s += std::to_string(getMaxRaw()) + "],\n  \"counts\": [";
+  s += std::to_string(getMaxNoLock()) + "],\n  \"counts\": [";
 
   size_t i = 0;
   for (; i < counts_.size() - 1; i++) {
@@ -235,11 +236,11 @@ void DynamicHistogram::toProto(DensityMap* proto) {
   auto flush_it = insertion_buffer_.lockedIterator();
   flush(&flush_it);
 
-  dhist->add_bounds(getMinRaw());
+  dhist->add_bounds(getMinNoLock());
   for (size_t i = 0; i + 1 < ubounds_.size(); i++) {
     dhist->add_bounds(ubounds_[i]);
   }
-  dhist->add_bounds(getMaxRaw());
+  dhist->add_bounds(getMaxNoLock());
 
   for (size_t i = 0; i < counts_.size(); i++) {
     dhist->add_counts(counts_[i]);
@@ -256,14 +257,14 @@ double DynamicHistogram::decay_rate() const {
   return description().decay_rate();
 }
 
-double DynamicHistogram::getMinRaw() const {
+double DynamicHistogram::getMinNoLock() const {
   if (counts_[1] == 0) {
     return ubounds_[0];
   }
   return ubounds_[0] - (counts_[0] / counts_[1]) * (ubounds_[1] - ubounds_[0]);
 }
 
-double DynamicHistogram::getMaxRaw() const {
+double DynamicHistogram::getMaxNoLock() const {
   const size_t bx = ubounds_.size() - 2;
   if (counts_[bx] == 0.0) {
     // The last ubounds_ value is a fake value that allows std::upper_bound
@@ -276,10 +277,10 @@ double DynamicHistogram::getMaxRaw() const {
 
 double DynamicHistogram::getUpperBound(int i) const {
   if (i == -1) {
-    return getMinRaw();
+    return getMinNoLock();
   }
   if (static_cast<size_t>(i) == ubounds_.size()) {
-    return getMaxRaw();
+    return getMaxNoLock();
   }
   return ubounds_[i];
 }
@@ -327,6 +328,8 @@ void DynamicHistogram::refresh() {
     return;
   }
 
+  refresh_generation_ = generation_;
+
   total_count_ = 0.0;
   double min_count = std::numeric_limits<double>::max();
   double max_count = 0.0;
@@ -341,10 +344,32 @@ void DynamicHistogram::refresh() {
       max_count = count;
     }
   }
-  refresh_generation_ = generation_;
+
   if (min_count * 4 < max_count) {
     split_threshold_ = max_count;
   } else {
+    split_threshold_ = 2 * total_count_ / getNumBuckets();
+  }
+
+  if (static_cast<int32_t>(getNumBuckets()) != description().num_containers()) {
+    while (static_cast<int32_t>(getNumBuckets()) <
+           description().num_containers()) {
+      size_t bx = 0;
+      double highest_count = counts_[0];
+      for (size_t i = 1; i < counts_.size(); i++) {
+        if (counts_[i] > highest_count) {
+          bx = i;
+          highest_count = counts_[i];
+        }
+      }
+      split(bx);
+    }
+
+    while (static_cast<int32_t>(getNumBuckets()) >
+           description().num_containers()) {
+      merge();
+    }
+
     split_threshold_ = 2 * total_count_ / getNumBuckets();
   }
 }
@@ -385,13 +410,13 @@ size_t DynamicHistogram::insertValue(double val) {
 void DynamicHistogram::split(size_t bx) {
   double lower_bound;
   if (bx == 0) {
-    lower_bound = getMinRaw();
+    lower_bound = getMinNoLock();
   } else {
     lower_bound = ubounds_[bx - 1];
   }
 
   if (bx + 1 == ubounds_.size()) {
-    double upper_bound = getMaxRaw();
+    double upper_bound = getMaxNoLock();
     ubounds_.back() = (lower_bound + upper_bound) / 2.0;
     ubounds_.push_back(std::numeric_limits<double>::max());
     counts_[bx] /= 2.0;
@@ -413,6 +438,7 @@ void DynamicHistogram::split(size_t bx) {
     counts_[bx] /= 2.0;
     counts_[bx + 1] = counts_[bx];
   }
+  bucket_generation_.push_back(generation_);
 }
 
 void DynamicHistogram::merge() {
@@ -436,6 +462,7 @@ void DynamicHistogram::merge() {
     counts_[i] = counts_[i + 1];
   }
   counts_.pop_back();
+  bucket_generation_.pop_back();
 }
 
 }  // namespace dyden

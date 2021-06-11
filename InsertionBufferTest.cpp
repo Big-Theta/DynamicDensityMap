@@ -41,4 +41,23 @@ TEST(InsertionBufferTest, flush) {
   EXPECT_EQ(total_flushed, next_val * (next_val - 1) / 2);
 }
 
+TEST(InsertionBufferTest, overflow) {
+  InsertionBuffer<int> uut(/*buffer_size=*/10);
+
+  for (int i = 0; i < 20; i++) {
+    uut.addValue(i);
+  }
+
+  int num_flushed = 0;
+  int total_flushed = 0;
+  for (auto it = uut.lockedIterator(); it; ++it) {
+    num_flushed++;
+    total_flushed += *it;
+  }
+  EXPECT_EQ(num_flushed, 9);
+  // Only the last 9 values should be in the total, so subtract the first 11
+  // from the sum.
+  EXPECT_EQ(total_flushed, 20 * 19 / 2 - 11 * 10 / 2);
+}
+
 }  // namespace dhist

@@ -57,37 +57,44 @@ class DescriptionOpts {
         decay_rate_(0.0),
         refresh_interval_(512),
         title_("title"),
-        labels_({""}) {}
+        labels_({""}),
+        num_containers_(100) {}
 
+  MapType type() const { return type_; }
   DescriptionOpts& set_type(MapType type) {
     type_ = type;
     return *this;
   }
-  MapType type() const { return type_; }
 
+  double decay_rate() const { return decay_rate_; }
   DescriptionOpts& set_decay_rate(double decay_rate) {
     decay_rate_ = decay_rate;
     return *this;
   }
-  double decay_rate() const { return decay_rate_; }
 
+  size_t refresh_interval() const { return refresh_interval_; }
   DescriptionOpts& set_refresh_interval(size_t refresh_interval) {
     refresh_interval_ = refresh_interval;
     return *this;
   }
-  size_t refresh_interval() const { return refresh_interval_; }
 
+  const std::string& title() const { return title_; }
   DescriptionOpts& set_title(std::string title) {
     title_ = title;
     return *this;
   }
-  const std::string& title() const { return title_; }
 
+  std::vector<std::string> labels() const { return labels_; }
   DescriptionOpts& set_labels(std::vector<std::string> labels) {
     labels_ = labels;
     return *this;
   }
-  std::vector<std::string> labels() const { return labels_; }
+
+  int32_t num_containers() const { return num_containers_; }
+  DescriptionOpts& set_num_containers(int32_t num_containers) {
+    num_containers_ = num_containers;
+    return *this;
+  }
 
  private:
   MapType type_;
@@ -95,6 +102,7 @@ class DescriptionOpts {
   size_t refresh_interval_;
   std::string title_;
   std::vector<std::string> labels_;
+  int32_t num_containers_;
 };
 
 class Description {
@@ -103,7 +111,8 @@ class Description {
       : title_(opts.title()),
         labels_(opts.labels()),
         refresh_interval_(opts.refresh_interval()),
-        type_(opts.type()) {
+        type_(opts.type()),
+        num_containers_(opts.num_containers()) {
     set_decay_rate(opts.decay_rate());
   }
 
@@ -119,6 +128,11 @@ class Description {
 
   double decay_rate() const { return decay_rate_; }
   void set_decay_rate(double rate);
+
+  int32_t num_containers() const { return num_containers_; }
+  void set_num_containers(int32_t num_containers) {
+    num_containers_ = num_containers;
+  }
 
   size_t refresh_interval() const { return refresh_interval_; }
 
@@ -151,6 +165,7 @@ class Description {
   double decay_rate_;
   size_t refresh_interval_;
   MapType type_;
+  int32_t num_containers_;
 
   std::vector<double> decay_factors_;
 };

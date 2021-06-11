@@ -42,6 +42,7 @@ message DensityMapDescription {
   google.protobuf.Timestamp timestamp = 4;
   double decay_rate = 5;
   Type type = 6;
+  int32 num_containers = 7;
 }
 
 message ListDensityMapsParams {}

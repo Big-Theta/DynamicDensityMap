@@ -89,7 +89,7 @@ void DynamicDensityServiceImpl::Run(std::string address) {
   builder.RegisterService(&service_);
   cq_ = builder.AddCompletionQueue();
   server_ = builder.BuildAndStart();
-  std::cout << "Server listening on " << address << std::endl;
+  printf("Server listening on %s\n", address.c_str());
   HandleRpcs();
 }
 

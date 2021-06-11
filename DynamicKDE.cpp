@@ -144,7 +144,8 @@ DynamicKDE::DynamicKDE(const DynamicKDEOpts& opts)
                          .set_decay_rate(opts.decay_rate())
                          .set_refresh_interval(opts.refresh_interval())
                          .set_title(opts.title())
-                         .set_labels({opts.label()})),
+                         .set_labels({opts.label()})
+                         .set_num_containers(opts.num_kernels())),
       generation_(0),
       refresh_generation_(0),
       total_count_(0.0),
@@ -348,13 +349,13 @@ void DynamicKDE::refresh() {
     return;
   }
 
+  refresh_generation_ = generation_;
+  decayAll();
+
   total_count_ = 0.0;
   double min_count = std::numeric_limits<double>::max();
   double max_count = 0.0;
   for (size_t kx = 0; kx < kernels_.size(); kx++) {
-    kernels_[kx].decay(
-        description().decay_factor(generation_ - kernels_[kx].generation()),
-        generation_);
     double count = kernels_[kx].count();
     total_count_ += count;
     if (count < min_count) {
@@ -364,11 +365,40 @@ void DynamicKDE::refresh() {
       max_count = count;
     }
   }
-  refresh_generation_ = generation_;
   if (min_count * 4 < max_count) {
     split_threshold_ = max_count;
   } else {
     split_threshold_ = 2 * total_count_ / getNumKernels();
+  }
+
+  if (static_cast<int32_t>(getNumKernels()) != description().num_containers()) {
+    while (static_cast<int32_t>(getNumKernels()) <
+           description().num_containers()) {
+      size_t kx = 0;
+      double highest_count = kernels_[0].count();
+      for (size_t i = 1; i < kernels_.size(); i++) {
+        if (kernels_[i].count() > highest_count) {
+          kx = i;
+          highest_count = kernels_[i].count();
+        }
+      }
+      split(kx);
+    }
+
+    while (static_cast<int32_t>(getNumKernels()) >
+           description().num_containers()) {
+      merge();
+    }
+
+    split_threshold_ = 2 * total_count_ / getNumKernels();
+  }
+}
+
+void DynamicKDE::decayAll() {
+  for (size_t kx = 0; kx < kernels_.size(); kx++) {
+    kernels_[kx].decay(
+        description().decay_factor(generation_ - kernels_[kx].generation()),
+        generation_);
   }
 }
 
@@ -384,7 +414,7 @@ void DynamicKDE::split(size_t kx) {
 }
 
 void DynamicKDE::merge() {
-  refresh();
+  decayAll();
   size_t best_kx = 0;
   double smallest_sum = kernels_[0].count() + kernels_[1].count();
   for (size_t kx = 1; kx + 1 < kernels_.size(); kx++) {

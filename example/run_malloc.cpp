@@ -42,7 +42,7 @@ int main() {
   static constexpr std::chrono::duration kNumSeconds =
       std::chrono::seconds(600);
   static constexpr size_t kNumPtrs = 4096;
-  static constexpr int kNumThreads = 4;
+  static constexpr int kNumThreads = 5;
   std::thread threads[kNumThreads];
 
   std::atomic<void*> ptrs[kNumPtrs];

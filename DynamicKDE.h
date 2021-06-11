@@ -183,6 +183,8 @@ class DynamicKDE : public DensityMapBase {
 
   void refresh();
 
+  void decayAll();
+
   void split(size_t kx);
 
   void merge();

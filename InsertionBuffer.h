@@ -46,6 +46,7 @@ struct FlushIterator {
   FlushIterator(InsertionBuffer<T>* insertion_buffer)
       : ibuf_(insertion_buffer), processed_(0) {
     ibuf_->flush_mu_.lock();
+    std::scoped_lock(ibuf_->insert_mu_);
     idx_ = ibuf_->buffer_begin_;
     end_idx_ = ibuf_->buffer_end_;
     ptr_ = &ibuf_->buffer_[idx_];
@@ -122,7 +123,16 @@ class InsertionBuffer {
     }
     buffer_end_ = end;
 
-    unflushed_++;
+    if (unflushed_ + 1 < buffer_.size()) {
+      unflushed_++;
+    } else {
+      // Handle overflow by dropping the oldest element.
+      buffer_begin_++;
+      if (buffer_begin_ == buffer_.size()) {
+        buffer_begin_ = 0;
+      }
+    }
+
     return unflushed_;
   }
 

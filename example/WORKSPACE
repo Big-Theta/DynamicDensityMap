@@ -16,10 +16,17 @@ git_repository(
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 grpc_deps()
 
-git_repository(
+#git_repository(
+#    name = "dynamic_density_map",
+#    remote = "https://github.com/Big-Theta/DynamicDensityMap",
+#    branch = "master",
+#)
+
+# A local repository is more convenient for working with this actual file.
+# To use this, remove the git_repository with the same name.
+local_repository(
     name = "dynamic_density_map",
-    remote = "https://github.com/Big-Theta/DynamicDensityMap",
-    branch = "master",
+    path = "..",
 )
 
 load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")

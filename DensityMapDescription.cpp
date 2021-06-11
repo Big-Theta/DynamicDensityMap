@@ -27,14 +27,13 @@
 namespace dyden {
 
 void Description::setFromProto(const DensityMapDescription& proto) {
-  title_ = proto.title();
-
+  set_title(proto.title());
   labels_.clear();
   for (auto label : proto.labels()) {
     labels_.push_back(label);
   }
-
-  decay_rate_ = proto.decay_rate();
+  set_decay_rate(proto.decay_rate());
+  set_num_containers(proto.num_containers());
 }
 
 void Description::set_decay_rate(double rate) {
@@ -58,9 +57,9 @@ void Description::toProto(DensityMapDescription* proto) const {
   DensityMapIdentifier* identifier = proto->mutable_identifier();
   identifier->set_identity(identifier_.identity());
 
-  proto->set_title(title_);
+  proto->set_title(title());
 
-  for (const auto& label : labels_) {
+  for (const auto& label : labels()) {
     proto->add_labels(label);
   }
 
@@ -78,6 +77,8 @@ void Description::toProto(DensityMapDescription* proto) const {
   } else {
     proto->set_type(DensityMapDescription::KDE2D);
   }
+
+  proto->set_num_containers(num_containers());
 }
 
 /*static*/
@@ -93,5 +94,7 @@ void Description::copyToProto(const DensityMapDescription& from_proto,
   to_proto->mutable_timestamp()->set_nanos(from_proto.timestamp().nanos());
   to_proto->set_decay_rate(from_proto.decay_rate());
   to_proto->set_type(from_proto.type());
+  to_proto->set_num_containers(from_proto.num_containers());
 }
+
 }  // namespace dyden
