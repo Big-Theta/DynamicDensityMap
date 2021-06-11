@@ -115,8 +115,8 @@ cc_test(
 )
 
 cc_binary(
-    name = "dynamic_histogram_benchmark",
-    srcs = ["DynamicHistogramBenchmark.cpp"],
+    name = "density_map_benchmark",
+    srcs = ["DensityMapBenchmark.cpp"],
     deps = [
         ":dynamic_histogram",
         ":dynamic_kde",

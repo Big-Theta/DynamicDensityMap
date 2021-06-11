@@ -54,20 +54,20 @@ int main() {
       dyden::DynamicHistogramOpts()
           .setNumBuckets(100)
           .setDecayRate(0.00001)
-          .setTitle("malloc")
+          .setTitle("DynamicHistogram -- malloc")
           .setLabel("log(cycles)")
           .setRegisterWithServer(true));
   dyden::DynamicKDE dynamic_kde(dyden::DynamicKDEOpts()
                                     .setNumKernels(100)
                                     .setDecayRate(0.00001)
-                                    .setTitle("malloc")
+                                    .setTitle("DynamicKDE -- malloc")
                                     .setLabel("log(cycles)")
                                     .setRegisterWithServer(true));
   dyden::DynamicKDE2D dynamic_kde_2d(
       dyden::DynamicKDE2DOpts()
           .setNumKernels(75)
           .setDecayRate(0.00001)
-          .setTitle("malloc")
+          .setTitle("DynamicKDE2D -- malloc")
           .setLabels({"log(cycles)", "log(size)"})
           .setRegisterWithServer(true));
 
@@ -76,7 +76,7 @@ int main() {
         [&](int tx) {
           std::default_random_engine gen;
           std::uniform_int_distribution<size_t> ptr_idx_dist(0, kNumPtrs - 1);
-          std::uniform_real_distribution log_size_dist(0.0, log(1024 * 1024));
+          std::uniform_real_distribution log_size_dist(0.0, log(4 * 1024));
           gen.seed(tx);
 
           const auto start_time = std::chrono::system_clock::now();
