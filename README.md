@@ -21,7 +21,7 @@ Use the `show_density_map` binary to display images from a running server.
 ~/DynamicDensityMap$ bazel run :show_density_map -- --show=3
 ```
 
-![DynamicKDE2D Example](https://github.com/Big-Theta/DynamicDensityMap/blob/master/example/DynamicKDE2D.gif)
+![DynamicKDE2D Example](https://github.com/Big-Theta/DynamicDensityMap/blob/master/example/DynamicKDE2D.png)
 
 An example of building a binary in a separate workspace/repository and
 including support for the `DensityMapServer` can be found in the `example`
