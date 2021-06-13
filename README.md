@@ -15,14 +15,14 @@ Use the `show_density_map` binary to display images from a running server.
 ~/DynamicDensityMap$ bazel run :show_density_map -- --show=1 --animate
 ```
 
-![matplotlib window](https://github.com/Big-Theta/DynamicDensityMap/tree/master/example/animated_hist.gif)
+![DynamicHistogram Animation Example](https://github.com/Big-Theta/DynamicDensityMap/tree/master/example/animated_hist.gif)
 
 
 ```console
 ~/DynamicDensityMap$ bazel run :show_density_map -- --show=3
 ```
 
-![matplotlib window](https://github.com/Big-Theta/DynamicDensityMap/tree/master/example/DynamicKDE2D.gif)
+![DynamicKDE2D Example](https://github.com/Big-Theta/DynamicDensityMap/tree/master/example/DynamicKDE2D.gif)
 
 An example of building a binary in a separate workspace/repository and
 including support for the `DensityMapServer` can be found in the `example`
@@ -57,10 +57,13 @@ list_density_maps_result {
 ...
 ```
 
-Change the options of a `DynamicDensityMap` using the `--set_description` option.
-This can change the decay rate, the number of buckets/kernels, or display options.
-The map that is affected is identified through the `{"identifier": {"identity": N}}`
-field.
+The value `identity: 1` indicates that this graph can be displayed with the
+`--show=1` option.
+
+Change the options of a `DynamicDensityMap` using the `--set_description`
+option.  This can change the decay rate, the number of buckets/kernels, or
+display options.  The map that is affected is identified through the
+`{"identifier": {"identity": N}}` field.
 
 ```console
 ~/DynamicDensityMap$ bazel run :show_density_map -- --set_description='\
@@ -76,7 +79,7 @@ Future Work
    insertion, but it would allow for high-accuracy tracking of extreme
    quantiles. See [this old code](https://github.com/Big-Theta/DynamicDensityMap/blob/d59e24844b08286c9595c0fb9a078627aff31739/cpp/DynamicHistogram.h#L515)
    for an example of the concept.
-2. Support anomoly detection. A way to do this would be to store two
+2. Support anomaly detection. A way to do this would be to store two
    `DynamicHistogram` datastructures with different decay rates. Then
    periodically compute the "distance" between these two histograms. Something
    like a Jaccard distance will probably work.  If that distance exceeds some
@@ -111,7 +114,7 @@ Future Work
    could be classified and matched (see the anomaly detection idea in (2)).
 7. The `DynamicKDE` algorithm is visually more accurate than the
    `DynamicHistogram`, but it is significantly slower to do anything that
-   requires quantile inferrence because of a reliance on the `erfc` function to
+   requires quantile inference because of a reliance on the `erfc` function to
    compute `CDF` values. The `DynamicKDE` is important because it generalizes
    to two dimensions whereas the `DynamicHistogram` does not. However, perhaps
    some distribution other than a Gaussian exists which will generalize to two
