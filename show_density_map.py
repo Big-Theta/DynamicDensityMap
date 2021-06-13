@@ -55,29 +55,39 @@ def prepare_render_hist(
     f = np.zeros(len(x_d))
     total_count = sum(proto.counts)
 
-    def cdf(x):
-        c = 0.0
-        idx = 0
-
-        while proto.bounds[idx + 1] < x:
-            c += proto.counts[idx]
-            idx += 1
-
-        if idx < len(proto.counts):
-            c += proto.counts[idx] * (
-                    (x - proto.bounds[idx]) /
-                    (proto.bounds[idx + 1] - proto.bounds[idx]))
-        else:
-            c += proto.counts[-1]
-
-        return c / total_count
-
+    last_x = x_min
+    cursor = x_min
     last_cdf = 0.0
-    for i in range(1, len(x_d)):
-        x = x_d[i]
-        this_cdf = cdf(x)
-        f[i] = this_cdf - last_cdf
-        last_cdf = this_cdf
+    cdf = 0.0
+    idx = 0
+    x_idx = 0
+    x = x_d[x_idx]
+    f_idx = 0
+
+    bx = 0
+    while bx < len(proto.bounds) - 1:
+        lower = proto.bounds[bx]
+        upper = proto.bounds[bx + 1]
+
+        count = proto.counts[bx]
+
+        if lower == upper:
+            cdf += count / total_count
+            continue
+
+        factor = (count / total_count) / (upper - lower)
+        while x < upper:
+            cdf += factor * (x - cursor)
+            f[f_idx] = cdf - last_cdf
+            last_cdf = cdf
+            f_idx += 1
+            cursor = x
+            x_idx += 1
+            x = x_d[x_idx]
+
+        cdf += factor * (upper - cursor)
+        cursor = upper
+        bx += 1
 
     return x_d, f
 
