@@ -159,8 +159,7 @@ DynamicKDE::DynamicKDE(const DynamicKDEOpts& opts)
 }
 
 void DynamicKDE::addValue(double val) {
-  size_t unflushed = insertion_buffer_.addValue(val);
-  if (unflushed >= description().refreshInterval()) {
+  if (insertion_buffer_.addValue(val)) {
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
   }
@@ -273,7 +272,7 @@ double DynamicKDE::splitThreshold() const { return split_threshold_; }
 
 double DynamicKDE::decayRate() const { return description().decayRate(); }
 
-void DynamicKDE::flush(FlushIterator<double>* flush_it) {
+void DynamicKDE::flush(LockedFlushIterator<double>* flush_it) {
   for (; *flush_it; ++(*flush_it)) {
     flushValue(**flush_it);
   }

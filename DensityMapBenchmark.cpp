@@ -17,12 +17,12 @@
 // ------------------------------------------------------------------------
 // Benchmark                              Time             CPU   Iterations
 // ------------------------------------------------------------------------
-// BM_DynamicHistogramAddDecay         44.1 ns         44.1 ns     15381629
-// BM_DynamicHistogramAddNoDecay       41.8 ns         41.8 ns     16371044
-// BM_DynamicKDEAddDecay               47.9 ns         47.8 ns     14680331
-// BM_DynamicKDEAddNoDecay             43.2 ns         43.2 ns     16316539
-// BM_DynamicKDE2DAddDecay              365 ns          364 ns      1924448
-// BM_DynamicKDE2DAddNoDecay            344 ns          344 ns      1985875
+// BM_DynamicHistogramAddDecay         49.0 ns         48.7 ns     13664789
+// BM_DynamicHistogramAddNoDecay       43.3 ns         43.3 ns     15818786
+// BM_DynamicKDEAddDecay               49.0 ns         49.0 ns     14200164
+// BM_DynamicKDEAddNoDecay             50.8 ns         50.8 ns     13594814
+// BM_DynamicKDE2DAddDecay              400 ns          399 ns      1678976
+// BM_DynamicKDE2DAddNoDecay            380 ns          380 ns      1773928
 
 static void BM_DynamicHistogramAddDecay(benchmark::State &state) {
   std::vector<double> xvals;

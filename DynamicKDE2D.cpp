@@ -195,8 +195,7 @@ DynamicKDE2D::DynamicKDE2D(const DynamicKDE2DOpts& opts)
 }
 
 void DynamicKDE2D::addValue(double x, double y) {
-  size_t unflushed = insertion_buffer_.addValue(std::make_pair(x, y));
-  if (unflushed >= description().refreshInterval()) {
+  if (insertion_buffer_.addValue(std::make_pair(x, y))) {
     auto flush_it = insertion_buffer_.lockedIterator();
     flush(&flush_it);
   }

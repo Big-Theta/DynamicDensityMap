@@ -36,7 +36,7 @@
 #include "DensityMapDescription.h"
 #include "DensityMapServer.h"
 #include "DynamicDensity.pb.h"
-#include "InsertionBuffer.h"
+#include "LocklessInsertionBuffer.h"
 
 namespace dyden {
 
@@ -170,14 +170,14 @@ class DynamicKDE : public DensityMapBase {
   double total_count_;
   double split_threshold_;
 
-  InsertionBuffer<double> insertion_buffer_;
+  LocklessInsertionBuffer<double> insertion_buffer_;
   std::vector<Kernel> kernels_;
 
   double splitThreshold() const;
 
   double decayRate() const;
 
-  void flush(FlushIterator<double>* flush_it);
+  void flush(LockedFlushIterator<double>* flush_it);
 
   void flushValue(double val);
 

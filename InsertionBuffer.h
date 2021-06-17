@@ -109,11 +109,14 @@ class InsertionBuffer {
   friend struct FlushIterator<T>;
 
   InsertionBuffer(size_t buffer_size = 512)
-      : buffer_begin_(0), buffer_end_(0), unflushed_(0) {
+      : flush_at_population_(buffer_size / 2),
+        buffer_begin_(0),
+        buffer_end_(0),
+        unflushed_(0) {
     buffer_.resize(buffer_size);
   }
 
-  size_t addValue(T val) {
+  bool addValue(T val) {
     std::scoped_lock l(insert_mu_);
 
     buffer_[buffer_end_] = val;
@@ -133,7 +136,13 @@ class InsertionBuffer {
       }
     }
 
-    return unflushed_;
+    if (unflushed_ < flush_at_population_) {
+      return false;
+    }
+    if (unflushed_ == flush_at_population_ || unflushed_ + 2 >= capacity()) {
+      return true;
+    }
+    return false;
   }
 
   size_t capacity() const {
@@ -144,11 +153,10 @@ class InsertionBuffer {
     return FlushIterator(this);
   }
 
- protected:
+ private:
+  const size_t flush_at_population_;
   std::mutex insert_mu_;
   std::mutex flush_mu_;
-
- private:
   size_t buffer_begin_;
   size_t buffer_end_;
   size_t unflushed_;

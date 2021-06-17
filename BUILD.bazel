@@ -33,7 +33,7 @@ cc_library(
         ":density_map_description",
         ":density_map_server",
         ":dynamic_density_cc_proto",
-        ":insertion_buffer",
+        ":lockless_insertion_buffer",
     ],
     copts = [
         "-std=c++17",
@@ -63,7 +63,7 @@ cc_library(
         ":density_map_description",
         ":density_map_server",
         ":dynamic_density_cc_proto",
-        ":insertion_buffer",
+        ":lockless_insertion_buffer",
     ],
     copts = [
         "-std=c++17",
@@ -182,6 +182,25 @@ cc_test(
     srcs = ["InsertionBufferTest.cpp"],
     deps = [
         ":insertion_buffer",
+        "@gtest//:gtest",
+        "@gtest//:gtest_main"
+    ],
+    copts = [
+        "-std=c++17",
+    ],
+)
+
+# This requires -std=c++17 or higher.
+cc_library(
+    name = "lockless_insertion_buffer",
+    hdrs = ["LocklessInsertionBuffer.h"],
+)
+
+cc_test(
+    name = "lockless_insertion_buffer_test",
+    srcs = ["LocklessInsertionBufferTest.cpp"],
+    deps = [
+        ":lockless_insertion_buffer",
         "@gtest//:gtest",
         "@gtest//:gtest_main"
     ],

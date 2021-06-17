@@ -34,7 +34,7 @@
 #include "DensityMapDescription.h"
 #include "DensityMapServer.h"
 #include "DynamicDensity.pb.h"
-#include "InsertionBuffer.h"
+#include "LocklessInsertionBuffer.h"
 
 namespace dyden {
 
@@ -156,7 +156,7 @@ class DynamicHistogram : public DensityMapBase {
   double total_count_;
   double split_threshold_;
 
-  InsertionBuffer<double> insertion_buffer_;
+  LocklessInsertionBuffer<double> insertion_buffer_;
 
   // ubounds_ records the upper bound of a bucket. There isn't an upper bound
   // for the last bucket, so the length of counts_ will generally be one greater
@@ -175,7 +175,7 @@ class DynamicHistogram : public DensityMapBase {
 
   double getUpperBound(int i) const;
 
-  void flush(FlushIterator<double>* flush_it);
+  void flush(LockedFlushIterator<double>* flush_it);
 
   void flushValue(double val);
 
