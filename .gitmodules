@@ -1,0 +1,3 @@
+[submodule "submodules/digestible"]
+	path = submodules/digestible
+	url = https://github.com/SpirentOrion/digestible

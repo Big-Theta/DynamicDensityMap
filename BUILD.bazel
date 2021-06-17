@@ -118,6 +118,7 @@ cc_binary(
     name = "density_map_benchmark",
     srcs = ["DensityMapBenchmark.cpp"],
     deps = [
+        ":digestible",
         ":dynamic_histogram",
         ":dynamic_kde",
         ":dynamic_kde_2d",
@@ -237,4 +238,14 @@ cc_binary(
     copts = [
         "-std=c++17",
     ],
+)
+
+# This is used for benchmarking. T-Digest is another way of producing an
+# auto-scaling density map, and the digestible implementation is the fastest
+# version I found for C++.
+# TODO:There really should be a way to get this header using new_git_repository
+# in the WORKSPACE module.
+cc_library(
+    name = "digestible",
+    hdrs = ["submodules/digestible/include/digestible/digestible.h"],
 )
