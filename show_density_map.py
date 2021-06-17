@@ -73,6 +73,7 @@ def prepare_render_hist(
 
         if lower == upper:
             cdf += count / total_count
+            bx += 1
             continue
 
         factor = (count / total_count) / (upper - lower)
@@ -243,6 +244,10 @@ def gen_from_server():
                     DynamicDensity_pb2.RPCQueryResult.FromString,
             )(request)
             ddens = response.density_map_result
+
+            if args.print:
+                print(ddens)
+
             if hist_type is None:
                 if ddens.HasField("dynamic_histogram"):
                     hist_type = "dynamic_histogram"
