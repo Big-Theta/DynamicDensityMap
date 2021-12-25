@@ -19,13 +19,13 @@ grpc_deps()
 git_repository(
     name = "benchmark",
     remote = "https://github.com/google/benchmark",
-    tag = "v1.5.4",
+    branch = "master",
 )
 
 git_repository(
     name = "gtest",
     remote = "https://github.com/google/googletest",
-    branch = "master",
+    branch = "main",
 )
 
 load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")

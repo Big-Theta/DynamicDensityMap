@@ -226,20 +226,6 @@ cc_library(
     ],
 )
 
-cc_binary(
-    name = "run_malloc",
-    srcs = ["run_malloc.cpp"],
-    deps = [
-        ":density_map_server",
-        ":dynamic_histogram",
-        ":dynamic_kde",
-        ":dynamic_kde_2d",
-    ],
-    copts = [
-        "-std=c++17",
-    ],
-)
-
 # This is used for benchmarking. T-Digest is another way of producing an
 # auto-scaling density map, and the digestible implementation is the fastest
 # version I found for C++.
